@@ -1,3 +1,7 @@
+'''
+Read domains from Uniprot XML into a custom object
+'''
+
 import xml.etree.ElementTree as ET
 import string, sys
 
@@ -35,17 +39,13 @@ class protein:
         if (self.chain_end - last) > 1:
             self.domain_segments.append(('None',last, self.chain_end))
 
+def parse_xml(xmlpath):
+    tree = ET.parse(xmlpath)
+    root = tree.getroot()
+    ns = '{http://uniprot.org/uniprot}'
+    sequences = []
 
-# load XML
-tree = ET.parse(sys.argv[1])
-root = tree.getroot()
-
-
-ns = '{http://uniprot.org/uniprot}'
-
-sequences = []
-
-for entry in tree.iter(tag=ns+'entry'):
+    for entry in tree.iter(tag=ns+'entry'):
         accession = entry.find(ns+'accession')
         sequence = protein(accession.text)
 
@@ -75,3 +75,13 @@ for entry in tree.iter(tag=ns+'entry'):
         for seq in entry.iter(tag=ns+'sequence'):
             if seq.text is not None:
                 sequence.sequence = seq.text.replace('\n','')
+
+    return(sequences)
+
+if __name__ == "__main__":
+    uniprot = parse_xml(sys.argv[1])
+    print(len(uniprot))
+    for entry in uniprot:
+        print(entry.name)
+        print(entry.domains)
+        print(entry.topology)
