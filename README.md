@@ -1,5 +1,3 @@
 # CellScape: Interactive visualization of the cell surface proteome
 
-Plan on creating initial test visualization of the following human CEACAM proteins:
-P13688, A6NE38, A8MY49, O60430, Q069I7, Q13854, Q13857, Q13858, Q13859, Q13860,
-Q15600, Q15601, Q16170, Q5UB49, Q7KYP5, Q96CA7, Q9UQV9.
+Plan on creating initial test visualization of the following human CEACAM proteins: P13688, P06731, P31997, P40199, P40198, O75871, Q14002, Q2WEN9, Q6UY09, Q3KPI0, Q7Z692, A8MTB9.
