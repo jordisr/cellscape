@@ -6,8 +6,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import interpolate
 from scipy.signal import savgol_filter
+import sys
 
-def representative_shape(pts):
+def representative_shape(pts, delta_angle=5):
 
     # first we select points that are near the edge and distributed radially
     com = np.mean(pts,axis=0)
@@ -17,7 +18,6 @@ def representative_shape(pts):
     small_bound = np.percentile(distance,0)
     upper_bound = np.percentile(distance,100)
 
-    delta_angle = 5
     angle_range = np.arange(0,360,delta_angle)
     select_pts = [None for x in angle_range]
 
@@ -29,6 +29,8 @@ def representative_shape(pts):
                         select_pts[index] = pt_index
                 elif upper_bound > distance[pt_index] > distance[select_pts[index]]:
                         select_pts[index] = pt_index
+
+    print(select_pts)
 
     shape = list(filter(lambda x: x is not None, select_pts))
     shape.append(shape[0])
@@ -50,6 +52,7 @@ def representative_shape(pts):
 if __name__ == '__main__':
     print("Running unit test...")
 
+    '''
     from Bio.PDB import *
     parser = PDBParser()
     structure = parser.get_structure('4NOB', '4NOB.pdb')
@@ -69,3 +72,15 @@ if __name__ == '__main__':
     plt.scatter(pts[:,0],pts[:,1])
     plt.plot(out[0],out[1],color='k')
     plt.show()
+    '''
+
+    pts = np.loadtxt(open(sys.argv[1], 'r'), delimiter=",")
+    #print(pts)
+
+    # center coordinates
+    pts = pts - np.mean(pts, axis=0)
+
+    out = representative_shape(pts)
+
+    # output points
+    np.savetxt('tmp.csv', np.array(out).T, delimiter=',')
