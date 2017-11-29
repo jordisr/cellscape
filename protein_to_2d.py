@@ -40,7 +40,7 @@ def align_n_to_c(atoms):
     r2 = rotation_matrix(np.array([atoms_[0,0],0,atoms_[0,2]]), np.array([0,0,1]))
     #print(r2)
     atoms_ = np.dot(atoms_, r2)
-    return(atoms_)
+    return(atoms_ + com)
 
 parser = PDBParser()
 structure = parser.get_structure('PDB', sys.argv[1])

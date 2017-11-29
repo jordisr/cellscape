@@ -1,0 +1,14 @@
+{
+  "id": "string",
+  "name": "string",
+  "type": "object",
+  "topology":
+  {
+    "type": "array",
+    "items": {
+      "name": "string",
+      "start": "number",
+      "end": "number",
+    }
+  }
+}

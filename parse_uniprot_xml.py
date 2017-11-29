@@ -83,5 +83,5 @@ if __name__ == "__main__":
     print(len(uniprot))
     for entry in uniprot:
         print(entry.name)
-        print(entry.domains)
+        print(entry.domain_segments)
         print(entry.topology)
