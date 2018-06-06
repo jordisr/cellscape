@@ -44,6 +44,7 @@ parser.add_argument('--format', default='svg', help='Format to save graphics', c
 # experimental arguments, override other options
 parser.add_argument('--all_atom', action='store_true', default=False, help='(Experimental) Draw each residue')
 parser.add_argument('--backbone', default=False, choices=['all','ca'], help='(Experimental) Draw backbone with splines')
+parser.add_argument('--unstructured', action='store_true', default=False, help='(Experimental) Extra regions')
 
 args = parser.parse_args()
 
@@ -115,15 +116,6 @@ if __name__ == '__main__':
                 backbone_atoms.append(list(atom.get_vector()))
         backbone_atoms = np.array(backbone_atoms)
 
-    # collect highlighted residues
-    if args.highlight:
-        for residue in chain.get_residues():
-            res_id = residue.get_full_id()[3][1]
-            if res_id in args.highlight:
-                #highlight_res[res_id] = np.mean(np.array([list(r.get_vector()) for r in Selection.unfold_entities(residue,'A')]), axis=0)
-                highlight_res[res_id] = np.array([list(r.get_vector()) for r in Selection.unfold_entities(residue,'A')])
-                #highlight_res[res_id] = np.array(list(residue['CA'].get_vector()))
-
     # dictionary holding residue to np.array of atomic coordinates
     residue_to_atoms = dict()
     for residue in chain.get_residues():
@@ -184,7 +176,8 @@ if __name__ == '__main__':
         # draws those residues separately on top of previous polygons
         #highlight_com = np.dot(np.array(list(highlight_res.values())),mat)
         #plt.scatter(highlight_com[:,0],highlight_com[:,1], c='k')
-        for k,v in highlight_res.items():
+        highlight_res = [residue_to_atoms[int(i)] for i in args.highlight]
+        for v in highlight_res:
             res_coords = np.dot(v,mat)
             space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in res_coords])
             xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
