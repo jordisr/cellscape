@@ -10,10 +10,9 @@ vector with the vertical axis.
 
 TO DO:
 - reorganize code
-- read domains/colors from file?
-- add backbone ribbon option (with splines?)
-- compatibility with other molecular graphics programs (Chimera, VMD?)
+- work on backbone ribbon option with splines
 - write tutorial/documentation
+- compatibility with other molecular graphics programs (Chimera, VMD?)
 '''
 
 from Bio.PDB import *
@@ -22,7 +21,7 @@ from scipy import linalg
 import matplotlib.pyplot as plt
 import shapely.geometry as sg
 import shapely.ops as so
-import os, sys, re, argparse
+import os, sys, re, argparse, csv
 
 def check_simplify(value):
     fvalue = float(value)
@@ -35,29 +34,40 @@ def check_simplify(value):
 parser = argparse.ArgumentParser(description='Scalable Vector Graphics for Macromolecular Structure',  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--pdb', help='Input PDB file', required=True)
 parser.add_argument('--view', help='File with PyMol view', required=True)
+parser.add_argument('--domains', help='CSV-formatted file with region/domain boundaries')
 parser.add_argument('--save', default='out', help='Prefix to save graphics')
 parser.add_argument('--radius', default=1.5, help='Space-filling radius, in angstroms', type=float)
 parser.add_argument('--simplify', default=0, help='Amount to simplify resulting polygons', type=check_simplify)
 parser.add_argument('--highlight', type=int, help='List of residues to highlight',nargs='+')
 parser.add_argument('--format', default='svg', help='Format to save graphics', choices=['svg','pdf'])
 
-# experimental arguments
-parser.add_argument('--test', action='store_true', default=False, help='Experimental!')
-parser.add_argument('--all_atom', action='store_true', default=False, help='Experimental! Draw each residue')
-parser.add_argument('--backbone', action='store_true', default=False, help='Experimental!')
-parser.add_argument('--ca_backbone', action='store_true', default=False, help='Experimental!')
-
+# experimental arguments, override other options
+parser.add_argument('--all_atom', action='store_true', default=False, help='(Experimental) Draw each residue')
+parser.add_argument('--backbone', default=False, choices=['all','ca'], help='(Experimental) Draw backbone with splines')
 
 args = parser.parse_args()
 
 # arguments to be incorporated later
-parser.add_argument('--domains', type=int, help='List of domain boundaries, e.g. 1 10 11 20', nargs='+')
 parser.add_argument('--model', default=0, help='Model number in PDB to load')
 parser.add_argument('--chain', default='A', help='Chain(s) in structure to outline', nargs='+')
 parser.add_argument('--recenter', action='store_true', default=False, help='Recenter atomic coordinates')
 
 def rotation_matrix(v1, v2):
-    # formula for rotation matrix from:McTest
+    # formula for rotation matrix from:
+    # https://math.stackexchange.com/questions/293116/rotating-one-3d-vector-to-another
+
+    x = np.cross(v1,v2)
+    x /= np.linalg.norm(x)
+
+    a = np.array([
+    [0, -1*x[2], x[1]],
+    [x[2], 0, -1*x[0]],
+    [-1*x[1], x[0], 0]])
+
+    theta = np.dot(v1, v2)
+    theta /= (np.linalg.norm(v1) * np.linalg.norm(v2) )
+    theta = np.arccos(theta)
+
     return(linalg.expm(a * theta))
 
 def align_n_to_c(atoms):
@@ -93,17 +103,17 @@ if __name__ == '__main__':
     # set up residue highlights
     highlight_res = dict()
 
-    # backbone atoms
-    backbone_atoms = []
-    ca_atoms = []
-    for atom in chain.get_atoms():
-        atom_id = atom.get_full_id()[-1][0]
-        if atom_id in ('N','CA','C', 'O'):
-            backbone_atoms.append(list(atom.get_vector()))
-        if atom_id == 'CA':
-            ca_atoms.append(list(atom.get_vector()))
-    backbone_atoms = np.array(backbone_atoms)
-    ca_atoms = np.array(ca_atoms)
+    if args.backbone:
+        if args.backbone == 'all':
+            atom_group = ('N','CA','C', 'O')
+        elif args.backbone == 'ca':
+            atom_group = ('CA')
+        backbone_atoms = []
+        for atom in chain.get_atoms():
+            atom_id = atom.get_full_id()[-1][0]
+            if atom_id in atom_group:
+                backbone_atoms.append(list(atom.get_vector()))
+        backbone_atoms = np.array(backbone_atoms)
 
     # collect highlighted residues
     if args.highlight:
@@ -114,22 +124,20 @@ if __name__ == '__main__':
                 highlight_res[res_id] = np.array([list(r.get_vector()) for r in Selection.unfold_entities(residue,'A')])
                 #highlight_res[res_id] = np.array(list(residue['CA'].get_vector()))
 
-    if args.test:
-        test_domains = [(35,144), (146,237), (238, 322), (324, 415), (416, 498), (502, 593), (594,677)] # ceacam5 domain boundaries
-        residue_to_atoms = dict()
-        for residue in chain.get_residues():
-            res_id = residue.get_full_id()[3][1]
-            residue_to_atoms[res_id] = np.array([list(r.get_vector()) for r in Selection.unfold_entities(residue,'A')])
-        domain_atoms = []
-        for start,end in test_domains:
-            domain_atoms.append(np.concatenate([residue_to_atoms[r] for r in range(start,end)]))
+    # dictionary holding residue to np.array of atomic coordinates
+    residue_to_atoms = dict()
+    for residue in chain.get_residues():
+        res_id = residue.get_full_id()[3][1]
+        residue_to_atoms[res_id] = np.array([list(r.get_vector()) for r in Selection.unfold_entities(residue,'A')])
 
-    # transform and project atoms
-    #test_mat = np.array([
-    #    [-0.350587279, 0.472307622, -0.808711231],
-    #    [0.560661256, 0.797530472, 0.222723737],
-    #    [0.750165045, -0.375327766, -0.544408023]
-    #])
+    if args.domains:
+        domain_atoms = []
+        with open(args.domains) as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                (start,end) = (int(row['res_start']),int(row['res_end']))
+                domain_atoms.append(np.concatenate([residue_to_atoms[r] for r in range(start,end)]))
+
     mat = read_pymol_view(args.view)
     aligned_pts = np.dot(coords,mat)
     #aligned_pts = align_n_to_c(coords)
@@ -140,12 +148,7 @@ if __name__ == '__main__':
     plt.axis('off')
 
     # create space filling representation
-    if not args.test and not args.all_atom:
-        space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in aligned_pts])
-        xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
-        axs.fill(xs, ys, alpha=1, fc='#377eb8', ec='k')
-    elif args.test and not args.all_atom:
-        #sequential_colors = ['#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00','#ffff33']
+    if args.domains:
         sequential_colors = ['#FDB515','#00356B']
         for i,coords in enumerate(domain_atoms):
             domain_coords = np.dot(coords,mat)
@@ -158,8 +161,13 @@ if __name__ == '__main__':
             space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
             xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
             axs.fill(xs, ys, alpha=1, fc='#D3D3D3', ec='#A9A9A9')
+    else: # base case, space-filling of all atoms
+        space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in aligned_pts])
+        xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
+        axs.fill(xs, ys, alpha=1, fc='#377eb8', ec='k')
 
-    if args.backbone and not args.ca_backbone:
+    if args.backbone:
+        # backbone rendering, needs work
         from scipy import interpolate
         from scipy.signal import savgol_filter
         backbone_atoms = np.dot(backbone_atoms, mat)
@@ -171,21 +179,9 @@ if __name__ == '__main__':
         #unew = np.arange(0, 1.01, 0.01)
         #out = interpolate.splev(unew, tck)
         #plt.plot(out[0], out[1])
-    elif args.ca_backbone and not args.backbone:
-        from scipy import interpolate
-        from scipy.signal import savgol_filter
-        ca_atoms = np.dot(ca_atoms, mat)
-        plt.plot(ca_atoms[:,0], ca_atoms[:,1], c='k')
-        #fx = savgol_filter(ca_atoms[:,0],5,3)
-        #fy = savgol_filter(ca_atoms[:,1],5,3)
-        #plt.plot(fx, fy, c='k')
-        # now do optional interpolation for final coordinates
-        #tck, u = interpolate.splprep([fx,fy],s=0)
-        #unew = np.arange(0, 1.01, 0.01)
-        #out = interpolate.splev(unew, tck)
-        #plt.plot(out[0], out[1], c='k')
 
     if args.highlight:
+        # draws those residues separately on top of previous polygons
         #highlight_com = np.dot(np.array(list(highlight_res.values())),mat)
         #plt.scatter(highlight_com[:,0],highlight_com[:,1], c='k')
         for k,v in highlight_res.items():
