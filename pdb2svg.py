@@ -1,17 +1,22 @@
 '''
-pdb2svg: Scalable Vector Graphics for Macromolecular Structure
+pdb2svg:
+    Scalable Vector Graphics for Macromolecular Structure
 
-molecule2outline, pdb2outline, outline-molecule, MolecularOutline
+Author:
+    Jordi Silvestre-Ryan (jordisr@berkeley.edu)
 
-Author: Jordi Silvestre-Ryan (jordisr@berkeley.edu)
+Usage of program and description of each command-line argument given with:
+    python pdb2svg.py --help
 
-N.B. In absence of view matrix from user, a view will be chosen by aligning the N-C terminal
-vector with the vertical axis.
+Notes:
+    In absence of view matrix from user, a view will be chosen by aligning the
+    N-C terminal vector with the vertical axis (in progress).
 
 TO DO:
-- reorganize code
 - work on backbone ribbon option with splines
+- represent unstructured regions
 - write tutorial/documentation
+- decide where to put style options
 - compatibility with other molecular graphics programs (Chimera, VMD?)
 '''
 
@@ -19,6 +24,7 @@ from Bio.PDB import *
 import numpy as np
 from scipy import linalg
 import matplotlib.pyplot as plt
+from matplotlib import lines, text
 import shapely.geometry as sg
 import shapely.ops as so
 import os, sys, re, argparse, csv
@@ -34,15 +40,22 @@ def check_simplify(value):
 parser = argparse.ArgumentParser(description='Scalable Vector Graphics for Macromolecular Structure',  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--pdb', help='Input PDB file', required=True)
 parser.add_argument('--view', help='File with PyMol view', required=True)
-parser.add_argument('--domains', help='CSV-formatted file with region/domain boundaries')
 parser.add_argument('--save', default='out', help='Prefix to save graphics')
 parser.add_argument('--radius', default=1.5, help='Space-filling radius, in angstroms', type=float)
 parser.add_argument('--simplify', default=0, help='Amount to simplify resulting polygons', type=check_simplify)
 parser.add_argument('--highlight', type=int, help='List of residues to highlight',nargs='+')
 parser.add_argument('--format', default='svg', help='Format to save graphics', choices=['svg','pdf'])
 
+# visual options
+parser.add_argument('--scale-bar', action='store_true', default=False, help='Draw a scale bar')
+parser.add_argument('--axes', action='store_true', default=False, help='Draw x and y axes around molecule')
+
+# draw separate polygon around each residue, entire protein, or each domain
+parser.add_argument('--all', action='store_true', default=False, help='Draw all residues separately (overrides --domains and --backbone)')
+parser.add_argument('--domains', help='CSV-formatted file with region/domain boundaries')
+parser.add_argument('--outline', action='store_true', default=True, help='Draw one outline for entire structure (default behavior)')
+
 # experimental arguments, override other options
-parser.add_argument('--all_atom', action='store_true', default=False, help='(Experimental) Draw each residue')
 parser.add_argument('--backbone', default=False, choices=['all','ca'], help='(Experimental) Draw backbone with splines')
 parser.add_argument('--unstructured', action='store_true', default=False, help='(Experimental) Extra regions')
 
@@ -136,8 +149,15 @@ if __name__ == '__main__':
 
     # fire up a pyplot
     fig, axs = plt.subplots()
-    plt.axis('equal')
-    plt.axis('off')
+    #plt.axis('equal')
+    axs.set_aspect('equal')
+
+    if args.axes:
+        axs.xaxis.grid(False)
+        axs.yaxis.grid(True)
+        axs.axes.xaxis.set_ticklabels([])
+    else:
+        plt.axis('off')
 
     # create space filling representation
     if args.domains:
@@ -147,13 +167,13 @@ if __name__ == '__main__':
             space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
             xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
             axs.fill(xs, ys, alpha=1, fc=sequential_colors[i % len(sequential_colors)], ec='k')
-    elif args.all_atom:
+    elif args.all:
         for i,coords in residue_to_atoms.items():
             domain_coords = np.dot(coords,mat)
             space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
             xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
             axs.fill(xs, ys, alpha=1, fc='#D3D3D3', ec='#A9A9A9')
-    else: # base case, space-filling of all atoms
+    elif args.outline:
         space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in aligned_pts])
         xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
         axs.fill(xs, ys, alpha=1, fc='#377eb8', ec='k')
@@ -182,6 +202,16 @@ if __name__ == '__main__':
             space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in res_coords])
             xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
             axs.fill(xs, ys, alpha=1, fc='r', ec='k')
+
+    if args.scale_bar:
+        bar_length = 1*10
+        bar_pos_x = aligned_pts[0,0]
+        bar_pos_y = aligned_pts[0,1]
+        scale_bar = lines.Line2D([bar_pos_x,bar_pos_x], [bar_pos_y,bar_pos_y+bar_length], color='black', axes=axs, lw=5)
+        axs.add_line(scale_bar)
+        # legend for scale bar
+        #legend = text.Text(0,100, 'text label', ha='left', va='bottom', axes=axs)
+        #axs.add_artist(legend)
 
     # output coordinates and vector graphics
     out_prefix = args.save
