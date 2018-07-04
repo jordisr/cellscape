@@ -24,7 +24,7 @@ from Bio.PDB import *
 import numpy as np
 from scipy import linalg
 import matplotlib.pyplot as plt
-from matplotlib import lines, text
+from matplotlib import lines, text, cm
 import shapely.geometry as sg
 import shapely.ops as so
 import os, sys, re, argparse, csv
@@ -36,19 +36,24 @@ def check_simplify(value):
     else:
         raise argparse.ArgumentTypeError("Simplify called with value of %s. Choose a value between 0-2." % value)
 
-# parse command line arguments
 parser = argparse.ArgumentParser(description='Scalable Vector Graphics for Macromolecular Structure',  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+# input/output options
 parser.add_argument('--pdb', help='Input PDB file', required=True)
 parser.add_argument('--view', help='File with PyMol view', required=True)
 parser.add_argument('--save', default='out', help='Prefix to save graphics')
-parser.add_argument('--radius', default=1.5, help='Space-filling radius, in angstroms', type=float)
-parser.add_argument('--simplify', default=0, help='Amount to simplify resulting polygons', type=check_simplify)
-parser.add_argument('--highlight', type=int, help='List of residues to highlight',nargs='+')
 parser.add_argument('--format', default='svg', help='Format to save graphics', choices=['svg','pdf'])
 
-# visual options
+# visual style options
+parser.add_argument('--radius', default=1.5, help='Space-filling radius, in angstroms', type=float)
+parser.add_argument('--simplify', default=0, help='Amount to simplify resulting polygons', type=check_simplify)
 parser.add_argument('--scale-bar', action='store_true', default=False, help='Draw a scale bar')
 parser.add_argument('--axes', action='store_true', default=False, help='Draw x and y axes around molecule')
+parser.add_argument('--c', default='#377eb8', help='Color (if used)')
+parser.add_argument('--cmap', default='jet', help='Colormap (if used)')
+
+# residues to highlight separately
+parser.add_argument('--highlight', type=int, help='List of residues to highlight',nargs='+')
 
 # draw separate polygon around each residue, entire protein, or each domain
 parser.add_argument('--all', action='store_true', default=False, help='Draw all residues separately (overrides --domains and --backbone)')
@@ -161,7 +166,11 @@ if __name__ == '__main__':
 
     # create space filling representation
     if args.domains:
-        sequential_colors = ['#FDB515','#00356B']
+        # set color scheme
+        cmap = cm.get_cmap(args.cmap)
+        cmap_x = np.linspace(0.0,1.0,len(domain_atoms))
+        sequential_colors = [cmap(x) for x in cmap_x]
+        #sequential_colors = ['#FDB515','#00356B']
         for i,coords in enumerate(domain_atoms):
             domain_coords = np.dot(coords,mat)
             space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
@@ -176,7 +185,7 @@ if __name__ == '__main__':
     elif args.outline:
         space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in aligned_pts])
         xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
-        axs.fill(xs, ys, alpha=1, fc='#377eb8', ec='k')
+        axs.fill(xs, ys, alpha=1, fc=args.c, ec='k')
 
     if args.backbone:
         # backbone rendering, needs work
@@ -205,12 +214,12 @@ if __name__ == '__main__':
 
     if args.scale_bar:
         bar_length = 1*10
-        bar_pos_x = aligned_pts[0,0]
+        bar_pos_x = np.min(aligned_pts,axis=0)[0]
         bar_pos_y = aligned_pts[0,1]
         scale_bar = lines.Line2D([bar_pos_x,bar_pos_x], [bar_pos_y,bar_pos_y+bar_length], color='black', axes=axs, lw=5)
         axs.add_line(scale_bar)
         # legend for scale bar
-        #legend = text.Text(0,100, 'text label', ha='left', va='bottom', axes=axs)
+        #legend = text.Text(bar_pos_x,bar_pos_y+bar_length, '1 nm', ha='left', va='bottom', axes=axs)
         #axs.add_artist(legend)
 
     # output coordinates and vector graphics
