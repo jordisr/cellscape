@@ -10,14 +10,8 @@ Usage of program and description of each command-line argument given with:
 
 Notes:
     In absence of view matrix from user, a view will be chosen by aligning the
-    N-C terminal vector with the vertical axis (in progress).
+    N-C terminal vector with the vertical axis (feature in proress).
 
-TO DO:
-- work on backbone ribbon option with splines
-- represent unstructured regions
-- write tutorial/documentation
-- decide where to put style options
-- compatibility with other molecular graphics programs (Chimera, VMD?)
 '''
 
 from Bio.PDB import *
@@ -49,7 +43,7 @@ parser.add_argument('--radius', default=1.5, help='Space-filling radius, in angs
 parser.add_argument('--simplify', default=0, help='Amount to simplify resulting polygons', type=check_simplify)
 parser.add_argument('--scale-bar', action='store_true', default=False, help='Draw a scale bar')
 parser.add_argument('--axes', action='store_true', default=False, help='Draw x and y axes around molecule')
-parser.add_argument('--c', default='#377eb8', help='Color (if used)')
+parser.add_argument('--c', default='#D3D3D3', help='Color (if used)')
 parser.add_argument('--cmap', default='jet', help='Colormap (if used)')
 
 # residues to highlight separately
@@ -62,7 +56,11 @@ parser.add_argument('--outline', action='store_true', default=True, help='Draw o
 
 # experimental arguments, override other options
 parser.add_argument('--backbone', default=False, choices=['all','ca'], help='(Experimental) Draw backbone with splines')
-parser.add_argument('--unstructured', action='store_true', default=False, help='(Experimental) Extra regions')
+
+# orientation and extra residues
+parser.add_argument('--orientation', type=int, default=1, choices=[1,-1], help='Top-bottom orientation of protein (1:N>C or -1:C>N)')
+parser.add_argument('--top-spacer', type=float, default=0, help='Placeholder at top of structure (length in nm)')
+parser.add_argument('--bot-spacer', type=float, default=0, help='Placeholder at bottom of structure (length in nm)')
 
 parser.add_argument('--recenter', type=int, default=0, help='Recenter atomic coordinates on this residue')
 
@@ -180,6 +178,22 @@ if __name__ == '__main__':
         axs.axes.xaxis.set_ticklabels([])
     else:
         plt.axis('off')
+
+    # unstructured regions, temporary fix of line at top or bottom of protein
+    if args.orientation == 1:
+        top_id = -1
+        bot_id = 0
+    else:
+        top_id = 0
+        bot_id = -1
+
+    if args.top_spacer:
+        top_spacer = lines.Line2D([atom_coords[top_id,0],atom_coords[top_id,0]], [atom_coords[top_id,1],atom_coords[top_id,1]+args.orientation*args.top_spacer*10], color=args.c, axes=axs, lw=10, zorder=0)
+        axs.add_line(top_spacer)
+
+    if args.bot_spacer:
+        bot_spacer = lines.Line2D([atom_coords[bot_id,0],atom_coords[bot_id,0]], [atom_coords[bot_id,1],atom_coords[bot_id,1]-args.orientation*args.bot_spacer*10], color=args.c, axes=axs, lw=10, zorder=0)
+        axs.add_line(bot_spacer)
 
     # create space filling representation
     if args.domains:
