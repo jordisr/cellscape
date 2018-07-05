@@ -64,12 +64,13 @@ parser.add_argument('--outline', action='store_true', default=True, help='Draw o
 parser.add_argument('--backbone', default=False, choices=['all','ca'], help='(Experimental) Draw backbone with splines')
 parser.add_argument('--unstructured', action='store_true', default=False, help='(Experimental) Extra regions')
 
+parser.add_argument('--recenter', type=int, default=0, help='Recenter atomic coordinates on this residue')
+
 args = parser.parse_args()
 
 # arguments to be incorporated later
 parser.add_argument('--model', default=0, help='Model number in PDB to load')
 parser.add_argument('--chain', default='A', help='Chain(s) in structure to outline', nargs='+')
-parser.add_argument('--recenter', action='store_true', default=False, help='Recenter atomic coordinates')
 
 def rotation_matrix(v1, v2):
     # formula for rotation matrix from:
@@ -117,10 +118,30 @@ if __name__ == '__main__':
     parser = PDBParser()
     structure = parser.get_structure('PDB', args.pdb)
     chain = structure[0]
-    coords = np.array([list(atom.get_vector()) for atom in chain.get_atoms()])
 
     # set up residue highlights
     highlight_res = dict()
+
+    # load view matrix
+    view_mat = read_pymol_view(args.view)
+
+    # rotate coordinates with view matrix
+    chain.transform(view_mat,[0,0,0])
+    atom_coords = np.array([list(atom.get_vector()) for atom in chain.get_atoms()])
+
+    # recenter coordinates on residue (useful for orienting transmembrane proteins)
+    if args.recenter:
+        offset_res_id = args.recenter
+        # accessing chain by residue id seems to be problematic?
+        for residue in chain.get_residues():
+            res_id = residue.get_full_id()[3][1]
+            if res_id == offset_res_id:
+                (offset_x, offset_y, _) = np.mean(np.array([list(r.get_vector()) for r in Selection.unfold_entities(residue,'A')]),axis=0)
+    else:
+        offset_x = atom_coords[0,0]
+        offset_y = atom_coords[0,1]
+    chain.transform(np.identity(3), [-1*offset_x,-1*offset_y,0])
+    atom_coords = np.array([list(atom.get_vector()) for atom in chain.get_atoms()])
 
     if args.backbone:
         if args.backbone == 'all':
@@ -148,10 +169,6 @@ if __name__ == '__main__':
                 (start,end) = (int(row['res_start']),int(row['res_end']))
                 domain_atoms.append(np.concatenate([residue_to_atoms[r] for r in range(start,end)]))
 
-    mat = read_pymol_view(args.view)
-    aligned_pts = np.dot(coords,mat)
-    #aligned_pts = align_n_to_c(coords)
-
     # fire up a pyplot
     fig, axs = plt.subplots()
     #plt.axis('equal')
@@ -172,18 +189,20 @@ if __name__ == '__main__':
         sequential_colors = [cmap(x) for x in cmap_x]
         #sequential_colors = ['#FDB515','#00356B']
         for i,coords in enumerate(domain_atoms):
-            domain_coords = np.dot(coords,mat)
+            #domain_coords = np.dot(coords,mat)
+            domain_coords = coords
             space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
             xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
             axs.fill(xs, ys, alpha=1, fc=sequential_colors[i % len(sequential_colors)], ec='k')
     elif args.all:
         for i,coords in residue_to_atoms.items():
-            domain_coords = np.dot(coords,mat)
+            #domain_coords = np.dot(coords,mat)
+            domain_coords = coords
             space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
             xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
             axs.fill(xs, ys, alpha=1, fc='#D3D3D3', ec='#A9A9A9')
     elif args.outline:
-        space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in aligned_pts])
+        space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in atom_coords])
         xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
         axs.fill(xs, ys, alpha=1, fc=args.c, ec='k')
 
@@ -191,7 +210,7 @@ if __name__ == '__main__':
         # backbone rendering, needs work
         from scipy import interpolate
         from scipy.signal import savgol_filter
-        backbone_atoms = np.dot(backbone_atoms, mat)
+        #backbone_atoms = np.dot(backbone_atoms, mat)
         fx = savgol_filter(backbone_atoms[:,0],21,3)
         fy = savgol_filter(backbone_atoms[:,1],21,3)
         plt.plot(fx, fy, c='k')
@@ -207,15 +226,16 @@ if __name__ == '__main__':
         #plt.scatter(highlight_com[:,0],highlight_com[:,1], c='k')
         highlight_res = [residue_to_atoms[int(i)] for i in args.highlight]
         for v in highlight_res:
-            res_coords = np.dot(v,mat)
+            #res_coords = np.dot(v,mat)
+            res_coords = v
             space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in res_coords])
             xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
             axs.fill(xs, ys, alpha=1, fc='r', ec='k')
 
     if args.scale_bar:
         bar_length = 1*10
-        bar_pos_x = np.min(aligned_pts,axis=0)[0]
-        bar_pos_y = aligned_pts[0,1]
+        bar_pos_x = np.min(atom_coords,axis=0)[0]
+        bar_pos_y = atom_coords[0,1]
         scale_bar = lines.Line2D([bar_pos_x,bar_pos_x], [bar_pos_y,bar_pos_y+bar_length], color='black', axes=axs, lw=5)
         axs.add_line(scale_bar)
         # legend for scale bar
