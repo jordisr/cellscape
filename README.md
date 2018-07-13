@@ -31,4 +31,4 @@ res_start,res_end,description
 237,319,Ig-like C2-type 2
 ```
 
-3. Finally run `pdb2svg.py --view view.txt --domains domains.csv` to generate an outline named `out.svg`. Full command-line options are available with `pdb2svg.py --help`.
+3. Finally run `pdb2svg.py --pdb protein.pdb --view view.txt --domains domains.csv` to generate an outline named `out.svg`. Full command-line options are available with `pdb2svg.py --help`.
