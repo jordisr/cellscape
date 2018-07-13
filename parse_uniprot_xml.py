@@ -80,8 +80,15 @@ def parse_xml(xmlpath):
 
 if __name__ == "__main__":
     uniprot = parse_xml(sys.argv[1])
-    print(len(uniprot))
+    #print(len(uniprot))
+    #for entry in uniprot:
+    #    print(entry.name)
+    #    print(entry.domain_segments)
+    #    print(entry.topology)
+
+    # csv output for pdb2svg
     for entry in uniprot:
         print(entry.name)
-        print(entry.domain_segments)
-        print(entry.topology)
+        print(','.join(['res_start','res_end','description']))
+        for domain in entry.domains:
+            print(','.join(map(str,[domain[1],domain[2],,domain[0]])))

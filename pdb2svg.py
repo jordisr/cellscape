@@ -165,7 +165,13 @@ if __name__ == '__main__':
             reader = csv.DictReader(csvfile)
             for row in reader:
                 (start,end) = (int(row['res_start']),int(row['res_end']))
-                domain_atoms.append(np.concatenate([residue_to_atoms[r] for r in range(start,end)]))
+                this_domain = []
+                for r in range(start,end):
+                    if r in residue_to_atoms:
+                        this_domain.append(residue_to_atoms[r])
+                    else:
+                        print('WARNING: Missing residue',r,'in structure!')
+                domain_atoms.append(np.concatenate(this_domain))
 
     # fire up a pyplot
     fig, axs = plt.subplots()
@@ -201,24 +207,26 @@ if __name__ == '__main__':
         cmap = cm.get_cmap(args.cmap)
         cmap_x = np.linspace(0.0,1.0,len(domain_atoms))
         sequential_colors = [cmap(x) for x in cmap_x]
-        #sequential_colors = ['#FDB515','#00356B']
+        #sequential_colors = ['#FDB515','#00356B'] # berkeley
+        #sequential_colors = ['#B22234','#FFFFFF','#3C3B6E']
         for i,coords in enumerate(domain_atoms):
             #domain_coords = np.dot(coords,mat)
             domain_coords = coords
             space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
             xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
-            axs.fill(xs, ys, alpha=1, fc=sequential_colors[i % len(sequential_colors)], ec='k')
+            axs.fill(xs, ys, alpha=1, fc=sequential_colors[i % len(sequential_colors)], ec='k',zorder=2)
+            #axs.fill(xs, ys, alpha=1, fc=args.c, ec='k',zorder=2)
     elif args.all:
         for i,coords in residue_to_atoms.items():
             #domain_coords = np.dot(coords,mat)
             domain_coords = coords
             space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
             xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
-            axs.fill(xs, ys, alpha=1, fc='#D3D3D3', ec='#A9A9A9')
+            axs.fill(xs, ys, alpha=1, fc='#D3D3D3', ec='#A9A9A9',zorder=2)
     elif args.outline:
         space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in atom_coords])
         xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
-        axs.fill(xs, ys, alpha=1, fc=args.c, ec='k')
+        axs.fill(xs, ys, alpha=1, fc=args.c, ec='k', zorder=1)
 
     if args.backbone:
         # backbone rendering, needs work
@@ -258,5 +266,5 @@ if __name__ == '__main__':
 
     # output coordinates and vector graphics
     out_prefix = args.save
-    plt.savefig(out_prefix+'.'+args.format,transparent=True)
+    plt.savefig(out_prefix+'.'+args.format,transparent=True, pad_inches=0, bbox_inches='tight')
     #np.savetxt(out_prefix+'.csv',np.array([xs,ys]).T, delimiter=',') # save coordinates in csv
