@@ -1,5 +1,7 @@
 # Tools for proteome visualization
 
+<img src="ceacam5.svg" alt="logo" width=700/>
+
 ## pdb2svg
 Generate a 2d space-filling outline from a PDB structure.
 
