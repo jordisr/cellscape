@@ -1,5 +1,5 @@
-# CellScape: Tools for proteome visualization
-![Logo](cecam5.png)
+# Tools for proteome visualization
+
 ## pdb2svg
 Generate a 2d space-filling outline from a PDB structure.
 
@@ -21,7 +21,7 @@ set_view (\
   7324.144042969, 7506.925292969,  -20.000000000 )
 ### cut above here and paste into script ###
 ```
-Select the indicated region region and paste into a new text file (e.g. `view.txt`).
+Select the indicated region and paste into a new text file (e.g. `view.txt`).
 
 2. (Optional) If desired, the domain architecture can be specified in a comma-separated file like this:
 ```
@@ -31,4 +31,4 @@ res_start,res_end,description
 237,319,Ig-like C2-type 2
 ```
 
-3. Finally run `pdb2svg.py --view view.txt --domains domains.csv` to generate an outline named `out.svg`. Full command-line options are available with `pdb2svg.py --help`.
+3. Finally run `pdb2svg.py --pdb protein.pdb --view view.txt --domains domains.csv` to generate an outline named `out.svg`. Full command-line options are available with `pdb2svg.py --help`.
