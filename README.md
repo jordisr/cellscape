@@ -1,5 +1,5 @@
 # CellScape: Tools for proteome visualization
-
+![Logo](cecam5.png)
 ## pdb2svg
 Generate a 2d space-filling outline from a PDB structure.
 
