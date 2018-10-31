@@ -4,6 +4,7 @@ Read domains from Uniprot XML into a custom object
 
 import xml.etree.ElementTree as ET
 import string, sys
+import argparse
 
 class protein:
     """Data structure to hold topological/domain information"""
@@ -79,16 +80,26 @@ def parse_xml(xmlpath):
     return(sequences)
 
 if __name__ == "__main__":
-    uniprot = parse_xml(sys.argv[1])
+
+    parser = argparse.ArgumentParser(description='Parse UniProt XML file',  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--xml', help='Input XML file', required=True)
+    args = parser.parse_args()
+
+    uniprot = parse_xml(args.xml)
     #print(len(uniprot))
     #for entry in uniprot:
     #    print(entry.name)
     #    print(entry.domain_segments)
     #    print(entry.topology)
+    #    print(entry.ptm)
 
-    # csv output for pdb2svg
     for entry in uniprot:
-        print(entry.name)
-        print(','.join(['res_start','res_end','description']))
-        for domain in entry.domains:
-            print(','.join(map(str,[domain[1],domain[2],,domain[0]])))
+        with open(entry.name+'.domains.csv','w') as f:
+            f.write(','.join(['res_start','res_end','description'])+'\n')
+            for domain in entry.domain_segments:
+                f.write(','.join(map(str,[domain[1],domain[2],domain[0]]))+'\n')
+
+        with open(entry.name+'.topology.csv','w') as f:
+            f.write(','.join(['res_start','res_end','description'])+'\n')
+            for domain in entry.topology:
+                f.write(','.join(map(str,[domain[1],domain[2],domain[0]]))+'\n')
