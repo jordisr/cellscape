@@ -21,7 +21,9 @@ import matplotlib.pyplot as plt
 from matplotlib import lines, text, cm
 import shapely.geometry as sg
 import shapely.ops as so
-import os, sys, re, argparse, csv
+import os, sys, re, argparse, csv, pickle
+from scipy.signal import savgol_filter
+from scipy import interpolate
 
 def check_simplify(value):
     fvalue = float(value)
@@ -34,9 +36,10 @@ parser = argparse.ArgumentParser(description='Scalable Vector Graphics for Macro
 
 # input/output options
 parser.add_argument('--pdb', help='Input PDB file', required=True)
-parser.add_argument('--view', help='File with PyMol view', required=True)
+parser.add_argument('--view', help='File with output from PyMol get_view')
 parser.add_argument('--save', default='out', help='Prefix to save graphics')
 parser.add_argument('--format', default='svg', help='Format to save graphics', choices=['svg','pdf'])
+parser.add_argument('--export', action='store_true', help='Export Python object with structural information')
 
 # visual style options
 parser.add_argument('--radius', default=1.5, help='Space-filling radius, in angstroms', type=float)
@@ -101,6 +104,13 @@ def align_n_to_c(atoms):
     atoms_ = np.dot(atoms_, r2)
     return(atoms_ + com)
 
+def align_n_to_c_mat(atoms, sign=1):
+    com = np.mean(atoms, axis=0)
+    atoms_ = atoms - com
+    v1 = sign*atoms_[-1] - sign*atoms_[0] # N to C terminus
+    r1  = rotation_matrix(v1, np.array([0,1,0]))
+    return(r1)
+
 # read rotation matrix from PyMol get_view command
 def read_pymol_view(file):
     matrix = []
@@ -120,12 +130,15 @@ if __name__ == '__main__':
     # set up residue highlights
     highlight_res = dict()
 
-    # load view matrix
-    view_mat = read_pymol_view(args.view)
-
-    # rotate coordinates with view matrix
-    chain.transform(view_mat,[0,0,0])
-    atom_coords = np.array([list(atom.get_vector()) for atom in chain.get_atoms()])
+    if args.view:
+        # load view matrix
+        view_mat = read_pymol_view(args.view)
+        chain.transform(view_mat,[0,0,0])
+        atom_coords = np.array([list(atom.get_vector()) for atom in chain.get_atoms()])
+    else:
+        # align N to C terminus
+        atom_coords = np.array([list(atom.get_vector()) for atom in chain.get_atoms()])
+        chain.transform(align_n_to_c_mat(atom_coords,args.orientation),[0,0,0])
 
     # recenter coordinates on residue (useful for orienting transmembrane proteins)
     if args.recenter:
@@ -138,7 +151,7 @@ if __name__ == '__main__':
     else:
         offset_x = atom_coords[0,0]
         offset_y = atom_coords[0,1]
-    chain.transform(np.identity(3), [-1*offset_x,-1*offset_y,0])
+        chain.transform(np.identity(3), [-1*offset_x,-1*offset_y,0])
     atom_coords = np.array([list(atom.get_vector()) for atom in chain.get_atoms()])
 
     if args.backbone:
@@ -214,8 +227,12 @@ if __name__ == '__main__':
             domain_coords = coords
             space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
             xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
+            #fx = savgol_filter(xs,11,2)
+            #fy = savgol_filter(ys,11,2)
+            #tck, u = interpolate.splprep([fx, fy],s=3)
+            #unew = np.arange(0, 1.01, 0.01)
+            #out = interpolate.splev(unew, tck)
             axs.fill(xs, ys, alpha=1, fc=sequential_colors[i % len(sequential_colors)], ec='k',zorder=2)
-            #axs.fill(xs, ys, alpha=1, fc=args.c, ec='k',zorder=2)
     elif args.all:
         for i,coords in residue_to_atoms.items():
             #domain_coords = np.dot(coords,mat)
@@ -263,6 +280,36 @@ if __name__ == '__main__':
         # legend for scale bar
         #legend = text.Text(bar_pos_x,bar_pos_y+bar_length, '1 nm', ha='left', va='bottom', axes=axs)
         #axs.add_artist(legend)
+
+    if args.export:
+        # save 2d paths and protein metadata to a python pickle object0
+        space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in atom_coords])
+        xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
+        outline = np.array([xs,ys])
+
+        height = np.linalg.norm(atom_coords[-1] - atom_coords[0])
+        width = np.max(atom_coords[:,0]) - np.min(atom_coords[:,0])
+
+        data = {
+        'name': args.save,
+        'outline': outline,
+        'center': args.recenter,
+        'height': height,
+        'width':width,
+        'orientation':args.orientation
+        }
+
+        if args.domains:
+            domain_paths = []
+            for i,coords in enumerate(domain_atoms):
+                domain_coords = coords
+                space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
+                xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
+                domain_paths.append((xs,ys))
+            data['domain_paths'] = domain_paths
+
+        with open(args.save+'.pickle','wb') as f:
+            pickle.dump(data, f)
 
     # output coordinates and vector graphics
     out_prefix = args.save
