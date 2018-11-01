@@ -55,6 +55,7 @@ parser.add_argument('--highlight', type=int, help='List of residues to highlight
 # draw separate polygon around each residue, entire protein, or each domain
 parser.add_argument('--all', action='store_true', default=False, help='Draw all residues separately (overrides --domains and --backbone)')
 parser.add_argument('--domains', help='CSV-formatted file with region/domain boundaries')
+parser.add_argument('--topology', help='CSV-formatted file with topology boundaries')
 parser.add_argument('--outline', action='store_true', default=True, help='Draw one outline for entire structure (default behavior)')
 
 # experimental arguments, override other options
@@ -138,7 +139,7 @@ if __name__ == '__main__':
     else:
         # align N to C terminus
         atom_coords = np.array([list(atom.get_vector()) for atom in chain.get_atoms()])
-        chain.transform(align_n_to_c_mat(atom_coords,args.orientation),[0,0,0])
+        chain.transform(align_n_to_c_mat(atom_coords,orient_from_topo),[0,0,0])
 
     # recenter coordinates on residue (useful for orienting transmembrane proteins)
     if args.recenter:
@@ -185,6 +186,48 @@ if __name__ == '__main__':
                     else:
                         print('WARNING: Missing residue',r,'in structure!')
                 domain_atoms.append(np.concatenate(this_domain))
+
+    if args.topology:
+        # not currently used for automatic orienting
+        topologies = []
+        first_ex_flag = True
+        first_cy_flag = True
+        first_he_flag = True
+        with open(args.topology) as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                (start,end,description) = (int(row['res_start']),int(row['res_end']),row['description'])
+                topologies.append((start,end,description))
+                if description == 'Extracellular' and first_ex_flag:
+                    first_ex = (start, end)
+                    first_ex_flag = False
+                elif description == 'Helical' and first_he_flag:
+                    first_he = (start, end)
+                    first_he_flag = False
+                elif description == 'Cytoplasmic' and first_cy_flag:
+                    first_cy = (start, end)
+                    first_cy_flag = False
+        if first_ex[0] < first_cy[0]:
+            orient_from_topo = -1
+        elif first_ex[0] > first_cy[0]:
+            orient_from_topo = 1
+        if orient_from_topo == 1:
+            tm_start = first_cy[1]
+        elif orient_from_topo == -1:
+            tm_start = first_cy[0]
+
+        def safe_bounds(n, residue_to_atoms):
+            res_in_struct = list(residue_to_atoms.keys())
+            if n < np.min(res_in_struct):
+                return(np.min(res_in_struct))
+            elif n > np.max(res_in_struct):
+                return(np.max(res_in_struct))
+
+        offset_x = residue_to_atoms[safe_bounds(tm_start, residue_to_atoms)][0][0]
+        offset_y = residue_to_atoms[safe_bounds(tm_start, residue_to_atoms)][0][1]
+
+        chain.transform(np.identity(3), [-1*offset_x,-1*offset_y,0])
+        atom_coords = np.array([list(atom.get_vector()) for atom in chain.get_atoms()])
 
     # fire up a pyplot
     fig, axs = plt.subplots()
@@ -287,7 +330,7 @@ if __name__ == '__main__':
         xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
         outline = np.array([xs,ys])
 
-        height = np.linalg.norm(atom_coords[-1] - atom_coords[0])
+        height = np.max(atom_coords[:,1]) - np.min(atom_coords[:,1])
         width = np.max(atom_coords[:,0]) - np.min(atom_coords[:,0])
 
         data = {
@@ -314,4 +357,3 @@ if __name__ == '__main__':
     # output coordinates and vector graphics
     out_prefix = args.save
     plt.savefig(out_prefix+'.'+args.format,transparent=True, pad_inches=0, bbox_inches='tight')
-    #np.savetxt(out_prefix+'.csv',np.array([xs,ys]).T, delimiter=',') # save coordinates in csv
