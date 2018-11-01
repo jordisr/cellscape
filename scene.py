@@ -12,11 +12,12 @@ import glob
 
 parser = argparse.ArgumentParser(description='Structure SVG compositing',  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--grid', action='store_true', help='Grid display')
+parser.add_argument('--files', nargs='+', help='Pickled objects to load')
 args = parser.parse_args()
 
 #object_filenames = sys.argv[1:]
 object_list = []
-for path in glob.glob("*.pickle"):
+for path in args.files:
     with open(path,'rb') as f:
         data = pickle.load(f)
         object_list.append(data)
