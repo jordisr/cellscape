@@ -54,6 +54,7 @@ parser.add_argument('--highlight', type=int, help='List of residues to highlight
 
 # draw separate polygon around each residue, entire protein, or each domain
 parser.add_argument('--all', action='store_true', default=False, help='Draw all residues separately (overrides --domains and --backbone)')
+parser.add_argument('--depth', action='store_true', default=False, help='Experimental rendering')
 parser.add_argument('--domains', help='CSV-formatted file with region/domain boundaries')
 parser.add_argument('--topology', help='CSV-formatted file with topology boundaries')
 parser.add_argument('--outline', action='store_true', default=True, help='Draw one outline for entire structure (default behavior)')
@@ -276,6 +277,7 @@ if __name__ == '__main__':
             #unew = np.arange(0, 1.01, 0.01)
             #out = interpolate.splev(unew, tck)
             axs.fill(xs, ys, alpha=1, fc=sequential_colors[i % len(sequential_colors)], ec='k',zorder=2)
+
     elif args.all:
         for i,coords in residue_to_atoms.items():
             #domain_coords = np.dot(coords,mat)
@@ -283,6 +285,24 @@ if __name__ == '__main__':
             space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
             xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
             axs.fill(xs, ys, alpha=1, fc='#D3D3D3', ec='#A9A9A9',zorder=2)
+
+    elif args.depth:
+        z_coord = [np.mean(val[:,2]) for key,val in residue_to_atoms.items()]
+        cmap = cm.get_cmap('Blues_r')
+        def rescale_coord(z):
+            return (z-np.min(z_coord))/(np.max(z_coord)-np.min(z_coord))
+
+        space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in atom_coords])
+        xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
+        axs.fill(xs, ys, alpha=1, fc=args.c, ec='k', zorder=1)
+
+        for i,coords in sorted(residue_to_atoms.items(), key=lambda x: np.mean(x[1][:,2])):
+            res_color = cmap(rescale_coord(np.mean(coords[:,2])))
+            domain_coords = coords
+            space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
+            xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
+            axs.fill(xs, ys, alpha=1, fc=res_color, ec='#202020', zorder=2,linewidth=0.2)
+
     elif args.outline:
         space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in atom_coords])
         xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
