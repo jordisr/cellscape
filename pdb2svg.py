@@ -34,8 +34,12 @@ def check_simplify(value):
 
 parser = argparse.ArgumentParser(description='Scalable Vector Graphics for Macromolecular Structure',  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-# input/output options
+# input pdb options
 parser.add_argument('--pdb', help='Input PDB file', required=True)
+parser.add_argument('--model', type=int, default=0, help='Model number in PDB to load')
+parser.add_argument('--chain', default=['A'], help='Chain(s) in structure to outline', nargs='+')
+
+# general input/output options
 parser.add_argument('--view', help='File with output from PyMol get_view')
 parser.add_argument('--save', default='out', help='Prefix to save graphics')
 parser.add_argument('--format', default='svg', help='Format to save graphics', choices=['svg','pdf'])
@@ -53,27 +57,20 @@ parser.add_argument('--cmap', default='jet', help='Colormap (if used)')
 parser.add_argument('--highlight', type=int, help='List of residues to highlight',nargs='+')
 
 # draw separate polygon around each residue, entire protein, or each domain
-parser.add_argument('--all', action='store_true', default=False, help='Draw all residues separately (overrides --domains and --backbone)')
 parser.add_argument('--depth', action='store_true', default=False, help='Experimental rendering')
-parser.add_argument('--domains', help='CSV-formatted file with region/domain boundaries')
-parser.add_argument('--topology', help='CSV-formatted file with topology boundaries')
 parser.add_argument('--outline', action='store_true', default=True, help='Draw one outline for entire structure (default behavior)')
-
-# experimental arguments, override other options
-parser.add_argument('--backbone', default=False, choices=['all','ca'], help='(Experimental) Draw backbone with splines')
 
 # orientation and extra residues
 parser.add_argument('--orientation', type=int, default=1, choices=[1,-1], help='Top-bottom orientation of protein (1:N>C or -1:C>N)')
 parser.add_argument('--top-spacer', type=float, default=0, help='Placeholder at top of structure (length in nm)')
 parser.add_argument('--bot-spacer', type=float, default=0, help='Placeholder at bottom of structure (length in nm)')
 
+# arguments that need reworking
+parser.add_argument('--domains', help='CSV-formatted file with region/domain boundaries')
 parser.add_argument('--recenter', type=int, default=0, help='Recenter atomic coordinates on this residue')
+parser.add_argument('--topology', help='CSV-formatted file with topology boundaries')
 
 args = parser.parse_args()
-
-# arguments to be incorporated later
-parser.add_argument('--model', default=0, help='Model number in PDB to load')
-parser.add_argument('--chain', default='A', help='Chain(s) in structure to outline', nargs='+')
 
 def rotation_matrix(v1, v2):
     # formula for rotation matrix from:
@@ -127,7 +124,13 @@ if __name__ == '__main__':
 
     parser = PDBParser()
     structure = parser.get_structure('PDB', args.pdb)
-    chain = structure[0]
+    model = structure[args.model]
+
+    # select desired chains
+    if args.chain[0] == 'all':
+        chain_selection = [chain.id for chain in model.get_chains()]
+    else:
+        chain_selection = args.chain
 
     # set up residue highlights
     highlight_res = dict()
@@ -135,44 +138,38 @@ if __name__ == '__main__':
     if args.view:
         # load view matrix
         view_mat = read_pymol_view(args.view)
-        chain.transform(view_mat,[0,0,0])
-        atom_coords = np.array([list(atom.get_vector()) for atom in chain.get_atoms()])
+        model.transform(view_mat,[0,0,0])
     else:
         # align N to C terminus
-        atom_coords = np.array([list(atom.get_vector()) for atom in chain.get_atoms()])
-        chain.transform(align_n_to_c_mat(atom_coords,orient_from_topo),[0,0,0])
+        model.transform(align_n_to_c_mat(atom_coords,orient_from_topo),[0,0,0])
+
+    # rewrite so this line isn't in twice
+    atom_coords = np.concatenate([np.array([list(atom.get_vector()) for atom in model[chain].get_atoms()]) for chain in chain_selection])
 
     # recenter coordinates on residue (useful for orienting transmembrane proteins)
     if args.recenter:
         offset_res_id = args.recenter
         # accessing chain by residue id seems to be problematic?
-        for residue in chain.get_residues():
+        for residue in model.get_residues():
             res_id = residue.get_full_id()[3][1]
             if res_id == offset_res_id:
                 (offset_x, offset_y, _) = np.mean(np.array([list(r.get_vector()) for r in Selection.unfold_entities(residue,'A')]),axis=0)
     else:
         offset_x = atom_coords[0,0]
         offset_y = atom_coords[0,1]
-        chain.transform(np.identity(3), [-1*offset_x,-1*offset_y,0])
-    atom_coords = np.array([list(atom.get_vector()) for atom in chain.get_atoms()])
+        model.transform(np.identity(3), [-1*offset_x,-1*offset_y,0])
 
-    if args.backbone:
-        if args.backbone == 'all':
-            atom_group = ('N','CA','C', 'O')
-        elif args.backbone == 'ca':
-            atom_group = ('CA')
-        backbone_atoms = []
-        for atom in chain.get_atoms():
-            atom_id = atom.get_full_id()[-1][0]
-            if atom_id in atom_group:
-                backbone_atoms.append(list(atom.get_vector()))
-        backbone_atoms = np.array(backbone_atoms)
+    #atom_coords = np.array([list(atom.get_vector()) for atom in model.get_atoms()])
+    atom_coords = np.concatenate([np.array([list(atom.get_vector()) for atom in model[chain].get_atoms()]) for chain in chain_selection])
 
-    # dictionary holding residue to np.array of atomic coordinates
+    # dict of dicts holding residue to np.array of atomic coordinates
     residue_to_atoms = dict()
-    for residue in chain.get_residues():
-        res_id = residue.get_full_id()[3][1]
-        residue_to_atoms[res_id] = np.array([list(r.get_vector()) for r in Selection.unfold_entities(residue,'A')])
+    for chain in chain_selection:
+        residue_to_atoms[chain] = dict()
+        for residue in model[chain].get_residues():
+            res_id = residue.get_full_id()[3][1]
+            #print(residue.get_full_id())
+            residue_to_atoms[chain][res_id] = np.array([list(r.get_vector()) for r in Selection.unfold_entities(residue,'A')])
 
     if args.domains:
         domain_atoms = []
@@ -232,7 +229,6 @@ if __name__ == '__main__':
 
     # fire up a pyplot
     fig, axs = plt.subplots()
-    #plt.axis('equal')
     axs.set_aspect('equal')
 
     if args.axes:
@@ -278,28 +274,40 @@ if __name__ == '__main__':
             #out = interpolate.splev(unew, tck)
             axs.fill(xs, ys, alpha=1, fc=sequential_colors[i % len(sequential_colors)], ec='k',zorder=2)
 
-    elif args.all:
-        for i,coords in residue_to_atoms.items():
-            #domain_coords = np.dot(coords,mat)
-            domain_coords = coords
-            space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
-            xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
-            axs.fill(xs, ys, alpha=1, fc='#D3D3D3', ec='#A9A9A9',zorder=2)
-
     elif args.depth:
-        z_coord = [np.mean(val[:,2]) for key,val in residue_to_atoms.items()]
-        cmap = cm.get_cmap('Blues_r')
+
+        # only use atoms that will be drawn for outline (which ones are not here?)
+        atom_coords = np.array([])
+        res_data = []
+        for chain_i, chain in enumerate(chain_selection):
+            for res_id, coords in residue_to_atoms[chain].items():
+                res_data.append((chain_i, res_id, coords))
+                if len(atom_coords) == 0:
+                    atom_coords = coords
+                else:
+                    atom_coords = np.append(atom_coords,coords,axis=0)
+
+        # draw outline in the back first
+        space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in atom_coords])
+        try:
+            xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
+            axs.fill(xs, ys, alpha=1, fc='w', ec='k', zorder=1)
+        except:
+            pass
+
+        # color maps for different chains
+        cmap_names = ['Blues', 'Oranges', 'Greens', 'Reds', 'Purples']
+        cmap_list = [cm.get_cmap(x) for x in cmap_names]
+        cmap_colors = len(cmap_names)
+
+        z_coord = atom_coords[:,2]
         def rescale_coord(z):
             return (z-np.min(z_coord))/(np.max(z_coord)-np.min(z_coord))
 
-        space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in atom_coords])
-        xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
-        axs.fill(xs, ys, alpha=1, fc=args.c, ec='k', zorder=1)
-
-        for i,coords in sorted(residue_to_atoms.items(), key=lambda x: np.mean(x[1][:,2])):
-            res_color = cmap(rescale_coord(np.mean(coords[:,2])))
-            domain_coords = coords
-            space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
+        for row in sorted(res_data, key=lambda x: np.mean(x[2][:,2]), reverse=True):
+            coords = row[2]
+            res_color = cmap_list[row[0] % cmap_colors](rescale_coord(np.mean(coords[:,2])))
+            space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in coords])
             xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
             axs.fill(xs, ys, alpha=1, fc=res_color, ec='#202020', zorder=2,linewidth=0.2)
 
@@ -307,20 +315,6 @@ if __name__ == '__main__':
         space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in atom_coords])
         xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
         axs.fill(xs, ys, alpha=1, fc=args.c, ec='k', zorder=1)
-
-    if args.backbone:
-        # backbone rendering, needs work
-        from scipy import interpolate
-        from scipy.signal import savgol_filter
-        #backbone_atoms = np.dot(backbone_atoms, mat)
-        fx = savgol_filter(backbone_atoms[:,0],21,3)
-        fy = savgol_filter(backbone_atoms[:,1],21,3)
-        plt.plot(fx, fy, c='k')
-        # now do optional interpolation for final coordinates
-        #tck, u = interpolate.splprep([fx, fy],s=3)
-        #unew = np.arange(0, 1.01, 0.01)
-        #out = interpolate.splev(unew, tck)
-        #plt.plot(out[0], out[1])
 
     if args.highlight:
         # draws those residues separately on top of previous polygons
@@ -335,7 +329,7 @@ if __name__ == '__main__':
             axs.fill(xs, ys, alpha=1, fc='r', ec='k')
 
     if args.scale_bar:
-        bar_length = 1*10
+        bar_length = 10
         bar_pos_x = np.min(atom_coords,axis=0)[0]
         bar_pos_y = atom_coords[0,1]
         scale_bar = lines.Line2D([bar_pos_x,bar_pos_x], [bar_pos_y,bar_pos_y+bar_length], color='black', axes=axs, lw=5)
@@ -343,6 +337,10 @@ if __name__ == '__main__':
         # legend for scale bar
         #legend = text.Text(bar_pos_x,bar_pos_y+bar_length, '1 nm', ha='left', va='bottom', axes=axs)
         #axs.add_artist(legend)
+
+    # output coordinates and vector graphics
+    out_prefix = args.save
+    plt.savefig(out_prefix+'.'+args.format,transparent=True, pad_inches=0, bbox_inches='tight')
 
     if args.export:
         # save 2d paths and protein metadata to a python pickle object0
@@ -373,7 +371,3 @@ if __name__ == '__main__':
 
         with open(args.save+'.pickle','wb') as f:
             pickle.dump(data, f)
-
-    # output coordinates and vector graphics
-    out_prefix = args.save
-    plt.savefig(out_prefix+'.'+args.format,transparent=True, pad_inches=0, bbox_inches='tight')
