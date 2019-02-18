@@ -10,7 +10,7 @@ Usage of program and description of each command-line argument given with:
 
 Notes:
     In absence of view matrix from user, a view will be chosen by aligning the
-    N-C terminal vector with the vertical axis (feature in proress).
+    N-C terminal vector with the vertical axis.
 
 '''
 
@@ -44,13 +44,11 @@ parser.add_argument('--chain', default=['A'], help='Chain(s) in structure to out
 # general input/output options
 parser.add_argument('--view', help='File with output from PyMol get_view')
 parser.add_argument('--save', default='out', help='Prefix to save graphics')
-parser.add_argument('--format', default='svg', help='Format to save graphics', choices=['svg','pdf'])
+parser.add_argument('--format', default='svg', help='Format to save graphics', choices=['svg','pdf','png'])
 parser.add_argument('--export', action='store_true', help='Export Python object with structural information')
 
 # visual style options
 parser.add_argument('--radius', default=1.5, help='Space-filling radius, in angstroms', type=float)
-parser.add_argument('--simplify', default=0, help='Amount to simplify resulting polygons', type=check_simplify)
-parser.add_argument('--scale-bar', action='store_true', default=False, help='Draw a scale bar')
 parser.add_argument('--axes', action='store_true', default=False, help='Draw x and y axes around molecule')
 parser.add_argument('--c', default='#D3D3D3', help='Color (if used)')
 parser.add_argument('--cmap', default='jet', help='Colormap (if used)')
@@ -71,6 +69,8 @@ parser.add_argument('--bot-spacer', type=float, default=0, help='Placeholder at 
 parser.add_argument('--domains', help='CSV-formatted file with region/domain boundaries')
 parser.add_argument('--recenter', type=int, default=0, help='Recenter atomic coordinates on this residue')
 parser.add_argument('--topology', help='CSV-formatted file with topology boundaries')
+parser.add_argument('--simplify', default=0, help='Amount to simplify resulting polygons (experimental)', type=check_simplify)
+parser.add_argument('--scale-bar', action='store_true', default=False, help='Draw a scale bar (experimental)')
 
 args = parser.parse_args()
 
@@ -129,9 +129,9 @@ def hex_to_cmap(h, w=0.3, name='test'):
     b = int(h[5:7], 16)
     h, l, s = colorsys.rgb_to_hls(r/255,g/255,b/255)
     # lighter and darker versions of color in HLS space
-    c1 = (h, min(l+(1-w)*l, 1), s)
+    c3 = (h, min(l+(1-w)*l, 1), s)
     c2 = (h, l, s)
-    c3 = (h, max(l-(1-w)*l, 0), s)
+    c1 = (h, max(l-(1-w)*l, 0), s)
     # convert back to RGB and return colormap
     colors = [colorsys.hls_to_rgb(c[0], c[1], c[2]) for c in [c1, c2, c3]]
     return LinearSegmentedColormap.from_list(name, colors)
@@ -147,6 +147,7 @@ if __name__ == '__main__':
         chain_selection = [chain.id for chain in model.get_chains()]
     else:
         chain_selection = args.chain
+    untransformed_coords = np.concatenate([np.array([list(atom.get_vector()) for atom in model[chain].get_atoms()]) for chain in chain_selection])
 
     # set up residue highlights
     highlight_res = dict()
@@ -157,10 +158,7 @@ if __name__ == '__main__':
         model.transform(view_mat,[0,0,0])
     else:
         # align N to C terminus
-        model.transform(align_n_to_c_mat(atom_coords,orient_from_topo),[0,0,0])
-
-    # rewrite so this line isn't in twice
-    atom_coords = np.concatenate([np.array([list(atom.get_vector()) for atom in model[chain].get_atoms()]) for chain in chain_selection])
+        model.transform(align_n_to_c_mat(untransformed_coords, args.orientation),[0,0,0])
 
     # recenter coordinates on residue (useful for orienting transmembrane proteins)
     if args.recenter:
@@ -171,8 +169,8 @@ if __name__ == '__main__':
             if res_id == offset_res_id:
                 (offset_x, offset_y, _) = np.mean(np.array([list(r.get_vector()) for r in Selection.unfold_entities(residue,'A')]),axis=0)
     else:
-        offset_x = atom_coords[0,0]
-        offset_y = atom_coords[0,1]
+        offset_x = untransformed_coords[0,0]
+        offset_y = untransformed_coords[0,1]
         model.transform(np.identity(3), [-1*offset_x,-1*offset_y,0])
 
     #atom_coords = np.array([list(atom.get_vector()) for atom in model.get_atoms()])
@@ -253,6 +251,11 @@ if __name__ == '__main__':
         axs.axes.xaxis.set_ticklabels([])
     else:
         plt.axis('off')
+        plt.gca().set_axis_off()
+        plt.subplots_adjust(top = 1, bottom = 0, right = 1, left = 0, hspace = 0, wspace = 0)
+        plt.margins(0,0)
+        plt.gca().xaxis.set_major_locator(plt.NullLocator())
+        plt.gca().yaxis.set_major_locator(plt.NullLocator())
 
     # unstructured regions, temporary fix of line at top or bottom of protein
     if args.orientation == 1:
@@ -321,12 +324,12 @@ if __name__ == '__main__':
         def rescale_coord(z):
             return (z-np.min(z_coord))/(np.max(z_coord)-np.min(z_coord))
 
-        for row in sorted(res_data, key=lambda x: np.mean(x[2][:,2]), reverse=True):
+        for row in sorted(res_data, key=lambda x: np.mean(x[2][:,2]), reverse=False):
             coords = row[2]
             res_color = cmap_list[row[0] % cmap_colors](rescale_coord(np.mean(coords[:,2])))
             space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in coords])
-            xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
-            axs.fill(xs, ys, alpha=1, fc=res_color, ec='#202020', zorder=2,linewidth=0.4)
+            xs, ys = space_filling.simplify(args.simplify, preserve_topology=False).exterior.xy
+            axs.fill(xs, ys, alpha=1, fc=res_color, ec='#202020', zorder=2, linewidth=0.4)
 
         #print(np.min(atom_coords[:,0]), np.max(atom_coords[:,0]), np.min(atom_coords[:,1]), np.max(atom_coords[:,1]))
 
@@ -359,12 +362,7 @@ if __name__ == '__main__':
 
     # output coordinates and vector graphics
     out_prefix = args.save
-    plt.gca().set_axis_off()
-    plt.subplots_adjust(top = 1, bottom = 0, right = 1, left = 0, hspace = 0, wspace = 0)
-    plt.margins(0,0)
-    plt.gca().xaxis.set_major_locator(plt.NullLocator())
-    plt.gca().yaxis.set_major_locator(plt.NullLocator())
-    plt.savefig(out_prefix+'.'+args.format, transparent=True, pad_inches=0, bbox_inches='tight')
+    plt.savefig(out_prefix+'.'+args.format, transparent=True, pad_inches=0, bbox_inches='tight', dpi=300)
 
     if args.export:
         # save 2d paths and protein metadata to a python pickle object0
