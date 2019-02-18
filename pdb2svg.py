@@ -19,6 +19,8 @@ import numpy as np
 from scipy import linalg
 import matplotlib.pyplot as plt
 from matplotlib import lines, text, cm
+from matplotlib.colors import LinearSegmentedColormap
+import colorsys
 import shapely.geometry as sg
 import shapely.ops as so
 import os, sys, re, argparse, csv, pickle
@@ -119,6 +121,20 @@ def read_pymol_view(file):
             if len(fields) == 4:
                 matrix.append(list(map(float,fields[:3])))
     return(np.array(matrix)[:3])
+
+# define custom Lighter Color => Color => Darker Color cmap
+def hex_to_cmap(h, w=0.3, name='test'):
+    r = int(h[1:3], 16)
+    g = int(h[3:5], 16)
+    b = int(h[5:7], 16)
+    h, l, s = colorsys.rgb_to_hls(r/255,g/255,b/255)
+    # lighter and darker versions of color in HLS space
+    c1 = (h, min(l+(1-w)*l, 1), s)
+    c2 = (h, l, s)
+    c3 = (h, max(l-(1-w)*l, 0), s)
+    # convert back to RGB and return colormap
+    colors = [colorsys.hls_to_rgb(c[0], c[1], c[2]) for c in [c1, c2, c3]]
+    return LinearSegmentedColormap.from_list(name, colors)
 
 if __name__ == '__main__':
 
@@ -296,9 +312,10 @@ if __name__ == '__main__':
             pass
 
         # color maps for different chains
-        cmap_names = ['Blues', 'Oranges', 'Greens', 'Reds', 'Purples']
-        cmap_list = [cm.get_cmap(x) for x in cmap_names]
-        cmap_colors = len(cmap_names)
+        #cmap_names = ['Blues', 'Oranges', 'Greens', 'Reds', 'Purples']
+        #cmap_list = [cm.get_cmap(x) for x in cmap_names]
+        cmap_list = [hex_to_cmap(c) for c in ['#276ab3', '#feb308', '#6fc276', '#ff9408']]
+        cmap_colors = len(cmap_list)
 
         z_coord = atom_coords[:,2]
         def rescale_coord(z):
@@ -309,7 +326,9 @@ if __name__ == '__main__':
             res_color = cmap_list[row[0] % cmap_colors](rescale_coord(np.mean(coords[:,2])))
             space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in coords])
             xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
-            axs.fill(xs, ys, alpha=1, fc=res_color, ec='#202020', zorder=2,linewidth=0.2)
+            axs.fill(xs, ys, alpha=1, fc=res_color, ec='#202020', zorder=2,linewidth=0.4)
+
+        #print(np.min(atom_coords[:,0]), np.max(atom_coords[:,0]), np.min(atom_coords[:,1]), np.max(atom_coords[:,1]))
 
     elif args.outline:
         space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in atom_coords])
@@ -340,7 +359,12 @@ if __name__ == '__main__':
 
     # output coordinates and vector graphics
     out_prefix = args.save
-    plt.savefig(out_prefix+'.'+args.format,transparent=True, pad_inches=0, bbox_inches='tight')
+    plt.gca().set_axis_off()
+    plt.subplots_adjust(top = 1, bottom = 0, right = 1, left = 0, hspace = 0, wspace = 0)
+    plt.margins(0,0)
+    plt.gca().xaxis.set_major_locator(plt.NullLocator())
+    plt.gca().yaxis.set_major_locator(plt.NullLocator())
+    plt.savefig(out_prefix+'.'+args.format, transparent=True, pad_inches=0, bbox_inches='tight')
 
     if args.export:
         # save 2d paths and protein metadata to a python pickle object0
