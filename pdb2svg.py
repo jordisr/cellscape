@@ -16,16 +16,14 @@ Notes:
 
 from Bio.PDB import *
 import numpy as np
-from scipy import linalg
 import matplotlib.pyplot as plt
 from matplotlib import lines, text, cm
 from matplotlib.colors import LinearSegmentedColormap
-import colorsys
 import shapely.geometry as sg
 import shapely.ops as so
-import os, sys, re, argparse, csv, pickle
+import os, sys, re, argparse, csv, pickle, colorsys
 from scipy.signal import savgol_filter
-from scipy import interpolate
+from scipy import interpolate, linalg
 
 def check_simplify(value):
     fvalue = float(value)
@@ -39,7 +37,7 @@ parser = argparse.ArgumentParser(description='Scalable Vector Graphics for Macro
 # input pdb options
 parser.add_argument('--pdb', help='Input PDB file', required=True)
 parser.add_argument('--model', type=int, default=0, help='Model number in PDB to load')
-parser.add_argument('--chain', default=['A'], help='Chain(s) in structure to outline', nargs='+')
+parser.add_argument('--chain', default=['all'], help='Chain(s) in structure to outline', nargs='+')
 
 # general input/output options
 parser.add_argument('--view', help='File with output from PyMol get_view')
@@ -50,14 +48,19 @@ parser.add_argument('--export', action='store_true', help='Export Python object 
 # visual style options
 parser.add_argument('--radius', default=1.5, help='Space-filling radius, in angstroms', type=float)
 parser.add_argument('--axes', action='store_true', default=False, help='Draw x and y axes around molecule')
-parser.add_argument('--c', default='#D3D3D3', help='Color (if used)')
-parser.add_argument('--cmap', default='jet', help='Colormap (if used)')
+parser.add_argument('--color_by', default='same',  choices=['same', 'chain'], help='Color protein by chain')
+
+# lower level matplotlib graphics options
+parser.add_argument('--c', default=['#D3D3D3'], nargs='+', help='Set default color(s)')
+parser.add_argument('--cmap', default='jet', help='Set default color map')
+parser.add_argument('--ec', default='k', help='Set default edge color')
+parser.add_argument('--linewidth', default=0.7, type=float, help='Set default line width')
 
 # residues to highlight separately
 parser.add_argument('--highlight', type=int, help='List of residues to highlight',nargs='+')
 
 # draw separate polygon around each residue, entire protein, or each domain
-parser.add_argument('--depth', action='store_true', default=False, help='Experimental rendering')
+parser.add_argument('--residues', action='store_true', default=False, help='Draw residues separately and simulate surface rendering ')
 parser.add_argument('--outline', action='store_true', default=True, help='Draw one outline for entire structure (default behavior)')
 
 # orientation and extra residues
@@ -266,11 +269,11 @@ if __name__ == '__main__':
         bot_id = -1
 
     if args.top_spacer:
-        top_spacer = lines.Line2D([atom_coords[top_id,0],atom_coords[top_id,0]], [atom_coords[top_id,1],atom_coords[top_id,1]+args.orientation*args.top_spacer*10], color=args.c, axes=axs, lw=10, zorder=0)
+        top_spacer = lines.Line2D([atom_coords[top_id,0],atom_coords[top_id,0]], [atom_coords[top_id,1],atom_coords[top_id,1]+args.orientation*args.top_spacer*10], color=args.c[0], axes=axs, lw=10, zorder=0)
         axs.add_line(top_spacer)
 
     if args.bot_spacer:
-        bot_spacer = lines.Line2D([atom_coords[bot_id,0],atom_coords[bot_id,0]], [atom_coords[bot_id,1],atom_coords[bot_id,1]-args.orientation*args.bot_spacer*10], color=args.c, axes=axs, lw=10, zorder=0)
+        bot_spacer = lines.Line2D([atom_coords[bot_id,0],atom_coords[bot_id,0]], [atom_coords[bot_id,1],atom_coords[bot_id,1]-args.orientation*args.bot_spacer*10], color=args.c[0], axes=axs, lw=10, zorder=0)
         axs.add_line(bot_spacer)
 
     # create space filling representation
@@ -293,7 +296,7 @@ if __name__ == '__main__':
             #out = interpolate.splev(unew, tck)
             axs.fill(xs, ys, alpha=1, fc=sequential_colors[i % len(sequential_colors)], ec='k',zorder=2)
 
-    elif args.depth:
+    elif args.residues:
 
         # only use atoms that will be drawn for outline (which ones are not here?)
         atom_coords = np.array([])
@@ -310,14 +313,23 @@ if __name__ == '__main__':
         space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in atom_coords])
         try:
             xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
-            axs.fill(xs, ys, alpha=1, fc='w', ec='k', zorder=1)
+            axs.fill(xs, ys, alpha=1, fc='w', ec=args.ec, zorder=1)
         except:
             pass
 
-        # color maps for different chains
-        #cmap_names = ['Blues', 'Oranges', 'Greens', 'Reds', 'Purples']
-        #cmap_list = [cm.get_cmap(x) for x in cmap_names]
-        cmap_list = [hex_to_cmap(c) for c in ['#276ab3', '#feb308', '#6fc276', '#ff9408']]
+        # color maps for different chains or domains
+        # if color_by != 'same':
+        #   if len(args.c) > 1:
+        #       use args.c repeated over chains/domains
+        #   else:
+        #       get args.cmap at each point
+
+        #cmap_list = [cm.get_cmap(x) for x in ['Blues', 'Oranges', 'Greens', 'Reds', 'Purples']]
+        #cmap_list = [hex_to_cmap(c) for c in ['#276ab3', '#feb308', '#6fc276', '#ff9408']]
+        #cmap_list = [hex_to_cmap(c) for c in ['#F9E37E', '#E17272', '#F9E37E', '#F9977E']]
+        cmap_list = [hex_to_cmap(c) for c in ['#FDB515', '#EE1F60', '#FDB515', '#3B7EA1']]
+        if args.color_by == 'same':
+            cmap_list = [cmap_list[0]]
         cmap_colors = len(cmap_list)
 
         z_coord = atom_coords[:,2]
@@ -329,14 +341,15 @@ if __name__ == '__main__':
             res_color = cmap_list[row[0] % cmap_colors](rescale_coord(np.mean(coords[:,2])))
             space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in coords])
             xs, ys = space_filling.simplify(args.simplify, preserve_topology=False).exterior.xy
-            axs.fill(xs, ys, alpha=1, fc=res_color, ec='#202020', zorder=2, linewidth=0.4)
+            # ec='#202020' is a little lighter
+            axs.fill(xs, ys, alpha=1, fc=res_color, ec=args.ec, zorder=2, linewidth=args.linewidth)
 
         #print(np.min(atom_coords[:,0]), np.max(atom_coords[:,0]), np.min(atom_coords[:,1]), np.max(atom_coords[:,1]))
 
     elif args.outline:
         space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in atom_coords])
         xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
-        axs.fill(xs, ys, alpha=1, fc=args.c, ec='k', zorder=1)
+        axs.fill(xs, ys, alpha=1, fc=args.c[0], ec=args.ec, zorder=1)
 
     if args.highlight:
         # draws those residues separately on top of previous polygons
