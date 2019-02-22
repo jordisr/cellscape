@@ -3,8 +3,9 @@ Read domains from Uniprot XML into a custom object
 '''
 
 import xml.etree.ElementTree as ET
-import string, sys
+import sys
 import argparse
+import json
 
 class protein:
     """Data structure to hold topological/domain information"""
@@ -83,23 +84,27 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Parse UniProt XML file',  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--xml', help='Input XML file', required=True)
+    parser.add_argument('--json', action='store_true', default=False, help='Output relevant information in JSON')
     args = parser.parse_args()
 
     uniprot = parse_xml(args.xml)
-    #print(len(uniprot))
-    #for entry in uniprot:
-    #    print(entry.name)
-    #    print(entry.domain_segments)
-    #    print(entry.topology)
-    #    print(entry.ptm)
 
     for entry in uniprot:
-        with open(entry.name+'.domains.csv','w') as f:
-            f.write(','.join(['res_start','res_end','description'])+'\n')
-            for domain in entry.domain_segments:
-                f.write(','.join(map(str,[domain[1],domain[2],domain[0]]))+'\n')
+        if args.json:
+            data = {
+            'name': entry.name,
+            'sequence': entry.sequence,
+            'domains': entry.domain_segments,
+            'topology': entry.topology
+            }
+            print(json.dumps(data, indent=2))
+        else:
+            with open(entry.name+'.domains.csv','w') as f:
+                f.write(','.join(['res_start','res_end','description'])+'\n')
+                for domain in entry.domain_segments:
+                    f.write(','.join(map(str,[domain[1],domain[2],domain[0]]))+'\n')
 
-        with open(entry.name+'.topology.csv','w') as f:
-            f.write(','.join(['res_start','res_end','description'])+'\n')
-            for domain in entry.topology:
-                f.write(','.join(map(str,[domain[1],domain[2],domain[0]]))+'\n')
+            with open(entry.name+'.topology.csv','w') as f:
+                f.write(','.join(['res_start','res_end','description'])+'\n')
+                for domain in entry.topology:
+                    f.write(','.join(map(str,[domain[1],domain[2],domain[0]]))+'\n')

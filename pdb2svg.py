@@ -25,6 +25,8 @@ import os, sys, re, argparse, csv, pickle, colorsys
 from scipy.signal import savgol_filter
 from scipy import interpolate, linalg
 
+from parse_uniprot_xml import parse_xml
+
 def check_simplify(value):
     fvalue = float(value)
     if fvalue > 0 and fvalue < 2:
@@ -41,6 +43,7 @@ parser.add_argument('--chain', default=['all'], help='Chain(s) in structure to o
 
 # general input/output options
 parser.add_argument('--view', help='File with output from PyMol get_view')
+parser.add_argument('--uniprot', help='UniProt XML file to parse for sequence/domain/topology information')
 parser.add_argument('--save', default='out', help='Prefix to save graphics')
 parser.add_argument('--format', default='svg', help='Format to save graphics', choices=['svg','pdf','png'])
 parser.add_argument('--export', action='store_true', help='Export Python object with structural information')
@@ -51,8 +54,8 @@ parser.add_argument('--axes', action='store_true', default=False, help='Draw x a
 parser.add_argument('--color_by', default='same',  choices=['same', 'chain'], help='Color protein by chain')
 
 # lower level matplotlib graphics options
-parser.add_argument('--c', default=['#D3D3D3'], nargs='+', help='Set default color(s)')
-parser.add_argument('--cmap', default='jet', help='Set default color map')
+parser.add_argument('--c', default=['#D3D3D3'], nargs='+', help='Set default color(s) in hex RGB')
+parser.add_argument('--cmap', default='Set1', help='Set default color map')
 parser.add_argument('--ec', default='k', help='Set default edge color')
 parser.add_argument('--linewidth', default=0.7, type=float, help='Set default line width')
 
@@ -139,7 +142,24 @@ def hex_to_cmap(h, w=0.3, name='test'):
     colors = [colorsys.hls_to_rgb(c[0], c[1], c[2]) for c in [c1, c2, c3]]
     return LinearSegmentedColormap.from_list(name, colors)
 
+def rgb_to_cmap(h, w=0.3, name='test'):
+    r = h[0]
+    g = h[1]
+    b = h[2]
+    h, l, s = colorsys.rgb_to_hls(r, g, b)
+    # lighter and darker versions of color in HLS space
+    c3 = (h, min(l+(1-w)*l, 1), s)
+    c2 = (h, l, s)
+    c1 = (h, max(l-(1-w)*l, 0), s)
+    # convert back to RGB and return colormap
+    colors = [colorsys.hls_to_rgb(c[0], c[1], c[2]) for c in [c1, c2, c3]]
+    return LinearSegmentedColormap.from_list(name, colors)
+
 if __name__ == '__main__':
+
+    if args.uniprot:
+        up = parse_xml(args.uniprot)
+        # placeholder for reading in XML data
 
     parser = PDBParser()
     structure = parser.get_structure('PDB', args.pdb)
@@ -151,9 +171,6 @@ if __name__ == '__main__':
     else:
         chain_selection = args.chain
     untransformed_coords = np.concatenate([np.array([list(atom.get_vector()) for atom in model[chain].get_atoms()]) for chain in chain_selection])
-
-    # set up residue highlights
-    highlight_res = dict()
 
     if args.view:
         # load view matrix
@@ -176,7 +193,6 @@ if __name__ == '__main__':
         offset_y = untransformed_coords[0,1]
         model.transform(np.identity(3), [-1*offset_x,-1*offset_y,0])
 
-    #atom_coords = np.array([list(atom.get_vector()) for atom in model.get_atoms()])
     atom_coords = np.concatenate([np.array([list(atom.get_vector()) for atom in model[chain].get_atoms()]) for chain in chain_selection])
 
     # dict of dicts holding residue to np.array of atomic coordinates
@@ -185,7 +201,6 @@ if __name__ == '__main__':
         residue_to_atoms[chain] = dict()
         for residue in model[chain].get_residues():
             res_id = residue.get_full_id()[3][1]
-            #print(residue.get_full_id())
             residue_to_atoms[chain][res_id] = np.array([list(r.get_vector()) for r in Selection.unfold_entities(residue,'A')])
 
     if args.domains:
@@ -276,29 +291,8 @@ if __name__ == '__main__':
         bot_spacer = lines.Line2D([atom_coords[bot_id,0],atom_coords[bot_id,0]], [atom_coords[bot_id,1],atom_coords[bot_id,1]-args.orientation*args.bot_spacer*10], color=args.c[0], axes=axs, lw=10, zorder=0)
         axs.add_line(bot_spacer)
 
-    # create space filling representation
-    if args.domains:
-        # set color scheme
-        cmap = cm.get_cmap(args.cmap)
-        cmap_x = np.linspace(0.0,1.0,len(domain_atoms))
-        sequential_colors = [cmap(x) for x in cmap_x]
-        #sequential_colors = ['#FDB515','#00356B'] # berkeley
-        #sequential_colors = ['#B22234','#FFFFFF','#3C3B6E']
-        for i,coords in enumerate(domain_atoms):
-            #domain_coords = np.dot(coords,mat)
-            domain_coords = coords
-            space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
-            xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
-            #fx = savgol_filter(xs,11,2)
-            #fy = savgol_filter(ys,11,2)
-            #tck, u = interpolate.splprep([fx, fy],s=3)
-            #unew = np.arange(0, 1.01, 0.01)
-            #out = interpolate.splev(unew, tck)
-            axs.fill(xs, ys, alpha=1, fc=sequential_colors[i % len(sequential_colors)], ec='k',zorder=2)
-
-    elif args.residues:
-
-        # only use atoms that will be drawn for outline (which ones are not here?)
+    # main drawing routines
+    if args.residues:
         atom_coords = np.array([])
         res_data = []
         for chain_i, chain in enumerate(chain_selection):
@@ -309,27 +303,32 @@ if __name__ == '__main__':
                 else:
                     atom_coords = np.append(atom_coords,coords,axis=0)
 
-        # draw outline in the back first
+        # draw outline in the back first (in progress)
         space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in atom_coords])
         try:
             xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
-            axs.fill(xs, ys, alpha=1, fc='w', ec=args.ec, zorder=1)
+            axs.fill(xs, ys, alpha=0, fc='w', ec=args.ec, zorder=1)
         except:
             pass
 
-        # color maps for different chains or domains
-        # if color_by != 'same':
-        #   if len(args.c) > 1:
-        #       use args.c repeated over chains/domains
-        #   else:
-        #       get args.cmap at each point
-
+        # some colormaps I've tested
         #cmap_list = [cm.get_cmap(x) for x in ['Blues', 'Oranges', 'Greens', 'Reds', 'Purples']]
         #cmap_list = [hex_to_cmap(c) for c in ['#276ab3', '#feb308', '#6fc276', '#ff9408']]
         #cmap_list = [hex_to_cmap(c) for c in ['#F9E37E', '#E17272', '#F9E37E', '#F9977E']]
-        cmap_list = [hex_to_cmap(c) for c in ['#FDB515', '#EE1F60', '#FDB515', '#3B7EA1']]
-        if args.color_by == 'same':
-            cmap_list = [cmap_list[0]]
+        #cmap_list = [hex_to_cmap(c) for c in ['#FDB515', '#EE1F60', '#FDB515', '#3B7EA1']]
+
+        if args.color_by != 'same':
+            if len(args.c) > 1:
+                cmap_list = [hex_to_cmap(c) for c in args.c]
+            else:
+                # currently only have color_by chain so hard coding this, should
+                # generalize to domains fairly easily
+                cmap = cm.get_cmap(args.cmap)
+                #cmap_x = np.linspace(0.0,1.0, len(chain_selection)) # continuous cmap
+                #cmap_list = [rgb_to_cmap(cmap(x)) for x in cmap_x] # continuous cmap
+                cmap_list = [rgb_to_cmap(cmap(x)) for x in range(len(chain_selection))]
+        else:
+            cmap_list = [hex_to_cmap(args.c[0])]
         cmap_colors = len(cmap_list)
 
         z_coord = atom_coords[:,2]
@@ -343,13 +342,30 @@ if __name__ == '__main__':
             xs, ys = space_filling.simplify(args.simplify, preserve_topology=False).exterior.xy
             # ec='#202020' is a little lighter
             axs.fill(xs, ys, alpha=1, fc=res_color, ec=args.ec, zorder=2, linewidth=args.linewidth)
-
         #print(np.min(atom_coords[:,0]), np.max(atom_coords[:,0]), np.min(atom_coords[:,1]), np.max(atom_coords[:,1]))
 
-    elif args.outline:
-        space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in atom_coords])
-        xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
-        axs.fill(xs, ys, alpha=1, fc=args.c[0], ec=args.ec, zorder=1)
+    else:
+        if args.domains:
+            # set color scheme
+            cmap = cm.get_cmap(args.cmap)
+            cmap_x = np.linspace(0.0,1.0,len(domain_atoms))
+            sequential_colors = [cmap(x) for x in cmap_x]
+            #sequential_colors = ['#FDB515','#00356B'] # berkeley
+            #sequential_colors = ['#B22234','#FFFFFF','#3C3B6E']
+            for i,coords in enumerate(domain_atoms):
+                domain_coords = coords
+                space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
+                xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
+                #fx = savgol_filter(xs,11,2)
+                #fy = savgol_filter(ys,11,2)
+                #tck, u = interpolate.splprep([fx, fy],s=3)
+                #unew = np.arange(0, 1.01, 0.01)
+                #out = interpolate.splev(unew, tck)
+                axs.fill(xs, ys, alpha=1, fc=sequential_colors[i % len(sequential_colors)], ec='k',zorder=2)
+        else:
+            space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in atom_coords])
+            xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
+            axs.fill(xs, ys, alpha=1, fc=args.c[0], ec=args.ec, zorder=1)
 
     if args.highlight:
         # draws those residues separately on top of previous polygons
