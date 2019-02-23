@@ -49,11 +49,13 @@ parser.add_argument('--format', default='svg', help='Format to save graphics', c
 parser.add_argument('--export', action='store_true', help='Export Python object with structural information')
 
 # visual style options
+parser.add_argument('--residues', action='store_true', default=False, help='Draw residues separately and simulate surface rendering ')
+parser.add_argument('--color_by', default='same',  choices=['same', 'chain', 'domain'], help='Color protein by chain')
+parser.add_argument('--outline_domains', action='store_true', help='Outline each domain, implies --uniprot but not --residues')
+
+# lower level graphics options
 parser.add_argument('--radius', default=1.5, help='Space-filling radius, in angstroms', type=float)
 parser.add_argument('--axes', action='store_true', default=False, help='Draw x and y axes around molecule')
-parser.add_argument('--color_by', default='same',  choices=['same', 'chain'], help='Color protein by chain')
-
-# lower level matplotlib graphics options
 parser.add_argument('--c', default=['#D3D3D3'], nargs='+', help='Set default color(s) in hex RGB')
 parser.add_argument('--cmap', default='Set1', help='Set default color map')
 parser.add_argument('--ec', default='k', help='Set default edge color')
@@ -62,17 +64,12 @@ parser.add_argument('--linewidth', default=0.7, type=float, help='Set default li
 # residues to highlight separately
 parser.add_argument('--highlight', type=int, help='List of residues to highlight',nargs='+')
 
-# draw separate polygon around each residue, entire protein, or each domain
-parser.add_argument('--residues', action='store_true', default=False, help='Draw residues separately and simulate surface rendering ')
-parser.add_argument('--outline', action='store_true', default=True, help='Draw one outline for entire structure (default behavior)')
-
 # orientation and extra residues
 parser.add_argument('--orientation', type=int, default=1, choices=[1,-1], help='Top-bottom orientation of protein (1:N>C or -1:C>N)')
 parser.add_argument('--top-spacer', type=float, default=0, help='Placeholder at top of structure (length in nm)')
 parser.add_argument('--bot-spacer', type=float, default=0, help='Placeholder at bottom of structure (length in nm)')
 
 # arguments that need reworking
-parser.add_argument('--domains', help='CSV-formatted file with region/domain boundaries')
 parser.add_argument('--recenter', type=int, default=0, help='Recenter atomic coordinates on this residue')
 parser.add_argument('--topology', help='CSV-formatted file with topology boundaries')
 parser.add_argument('--simplify', default=0, help='Amount to simplify resulting polygons (experimental)', type=check_simplify)
@@ -157,10 +154,6 @@ def rgb_to_cmap(h, w=0.3, name='test'):
 
 if __name__ == '__main__':
 
-    if args.uniprot:
-        up = parse_xml(args.uniprot)
-        # placeholder for reading in XML data
-
     parser = PDBParser()
     structure = parser.get_structure('PDB', args.pdb)
     model = structure[args.model]
@@ -203,19 +196,39 @@ if __name__ == '__main__':
             res_id = residue.get_full_id()[3][1]
             residue_to_atoms[chain][res_id] = np.array([list(r.get_vector()) for r in Selection.unfold_entities(residue,'A')])
 
-    if args.domains:
+    if args.uniprot:
+        up = parse_xml(args.uniprot)[0]
+
+        # get mappings of residue to domain
+        residue_to_domains = dict()
+        d = 0
+        prev_domain = 'None'
+        for row in up.domain_segments:
+            (name, start, end) = row
+            if name == 'None':
+                for r in range(start, end+1):
+                    residue_to_domains[r] = d
+            else:
+                if prev_domain == 'None':
+                    d += 1
+                for r in range(start, end+1):
+                    residue_to_domains[r] = d
+            prev_domain = name
+
+        # retrieve domain residues and coordinates
         domain_atoms = []
-        with open(args.domains) as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                (start,end) = (int(row['res_start']),int(row['res_end']))
-                this_domain = []
-                for r in range(start,end):
-                    if r in residue_to_atoms:
-                        this_domain.append(residue_to_atoms[r])
-                    else:
-                        print('WARNING: Missing residue',r,'in structure!')
-                domain_atoms.append(np.concatenate(this_domain))
+        for row in up.domains:
+            (name, start, end) = row
+            this_domain = []
+            for r in range(start, end+1):
+                if r in residue_to_atoms[chain_selection[0]]:
+                    this_domain.append(residue_to_atoms[chain_selection[0]][r])
+                else:
+                    print('WARNING: Missing residue',r,'in structure!')
+            domain_atoms.append(np.concatenate(this_domain))
+
+    elif args.color_by == 'domain':
+        sys.exit("Error: No domain information. Need to specify topology with UniProt XML file (--uniprot)")
 
     if args.topology:
         # not currently used for automatic orienting
@@ -297,7 +310,11 @@ if __name__ == '__main__':
         res_data = []
         for chain_i, chain in enumerate(chain_selection):
             for res_id, coords in residue_to_atoms[chain].items():
-                res_data.append((chain_i, res_id, coords))
+                if not args.uniprot:
+                    domain_id = ""
+                else:
+                    domain_id = residue_to_domains.get(res_id, "")
+                res_data.append((chain_i, res_id, coords, domain_id))
                 if len(atom_coords) == 0:
                     atom_coords = coords
                 else:
@@ -318,17 +335,25 @@ if __name__ == '__main__':
         #cmap_list = [hex_to_cmap(c) for c in ['#FDB515', '#EE1F60', '#FDB515', '#3B7EA1']]
 
         if args.color_by != 'same':
+            if args.color_by == 'chain':
+                color_on_col = 0
+            elif args.color_by == 'domain':
+                color_on_col = 3
+
             if len(args.c) > 1:
                 cmap_list = [hex_to_cmap(c) for c in args.c]
             else:
-                # currently only have color_by chain so hard coding this, should
-                # generalize to domains fairly easily
                 cmap = cm.get_cmap(args.cmap)
                 #cmap_x = np.linspace(0.0,1.0, len(chain_selection)) # continuous cmap
                 #cmap_list = [rgb_to_cmap(cmap(x)) for x in cmap_x] # continuous cmap
-                cmap_list = [rgb_to_cmap(cmap(x)) for x in range(len(chain_selection))]
+                if args.color_by == 'chain':
+                    cmap_list = [rgb_to_cmap(cmap(x)) for x in range(len(chain_selection))]
+                elif args.color_by == 'domain':
+                    # currently no different color for linker regions
+                    cmap_list = [rgb_to_cmap(cmap(x)) for x in range(len(up.domains))]
         else:
             cmap_list = [hex_to_cmap(args.c[0])]
+            color_on_col = 0
         cmap_colors = len(cmap_list)
 
         z_coord = atom_coords[:,2]
@@ -337,7 +362,7 @@ if __name__ == '__main__':
 
         for row in sorted(res_data, key=lambda x: np.mean(x[2][:,2]), reverse=False):
             coords = row[2]
-            res_color = cmap_list[row[0] % cmap_colors](rescale_coord(np.mean(coords[:,2])))
+            res_color = cmap_list[row[color_on_col] % cmap_colors](rescale_coord(np.mean(coords[:,2])))
             space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in coords])
             xs, ys = space_filling.simplify(args.simplify, preserve_topology=False).exterior.xy
             # ec='#202020' is a little lighter
@@ -345,13 +370,14 @@ if __name__ == '__main__':
         #print(np.min(atom_coords[:,0]), np.max(atom_coords[:,0]), np.min(atom_coords[:,1]), np.max(atom_coords[:,1]))
 
     else:
-        if args.domains:
-            # set color scheme
-            cmap = cm.get_cmap(args.cmap)
-            cmap_x = np.linspace(0.0,1.0,len(domain_atoms))
-            sequential_colors = [cmap(x) for x in cmap_x]
-            #sequential_colors = ['#FDB515','#00356B'] # berkeley
-            #sequential_colors = ['#B22234','#FFFFFF','#3C3B6E']
+        if args.outline_domains:
+            if len(args.c) > 1:
+                sequential_colors = args.c
+            else:
+                cmap = cm.get_cmap(args.cmap)
+                cmap_x = np.linspace(0.0,1.0,len(domain_atoms))
+                sequential_colors = [cmap(x) for x in cmap_x]
+
             for i,coords in enumerate(domain_atoms):
                 domain_coords = coords
                 space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
@@ -373,7 +399,6 @@ if __name__ == '__main__':
         #plt.scatter(highlight_com[:,0],highlight_com[:,1], c='k')
         highlight_res = [residue_to_atoms[int(i)] for i in args.highlight]
         for v in highlight_res:
-            #res_coords = np.dot(v,mat)
             res_coords = v
             space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in res_coords])
             xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
@@ -411,7 +436,7 @@ if __name__ == '__main__':
         'orientation':args.orientation
         }
 
-        if args.domains:
+        if args.outline_domains:
             domain_paths = []
             for i,coords in enumerate(domain_atoms):
                 domain_coords = coords
