@@ -205,14 +205,10 @@ if __name__ == '__main__':
         prev_domain = 'None'
         for row in up.domain_segments:
             (name, start, end) = row
-            if name == 'None':
-                for r in range(start, end+1):
-                    residue_to_domains[r] = d
-            else:
-                if prev_domain == 'None':
-                    d += 1
-                for r in range(start, end+1):
-                    residue_to_domains[r] = d
+            if prev_domain != 'None':
+                d += 1
+            for r in range(start, end+1):
+                residue_to_domains[r] = d
             prev_domain = name
 
         # retrieve domain residues and coordinates
@@ -227,7 +223,7 @@ if __name__ == '__main__':
                     print('WARNING: Missing residue',r,'in structure!')
             domain_atoms.append(np.concatenate(this_domain))
 
-    elif args.color_by == 'domain':
+    elif args.color_by == 'domain' or args.outline_domains:
         sys.exit("Error: No domain information. Need to specify topology with UniProt XML file (--uniprot)")
 
     if args.topology:
@@ -367,7 +363,6 @@ if __name__ == '__main__':
             xs, ys = space_filling.simplify(args.simplify, preserve_topology=False).exterior.xy
             # ec='#202020' is a little lighter
             axs.fill(xs, ys, alpha=1, fc=res_color, ec=args.ec, zorder=2, linewidth=args.linewidth)
-        #print(np.min(atom_coords[:,0]), np.max(atom_coords[:,0]), np.min(atom_coords[:,1]), np.max(atom_coords[:,1]))
 
     else:
         if args.outline_domains:
@@ -375,8 +370,7 @@ if __name__ == '__main__':
                 sequential_colors = args.c
             else:
                 cmap = cm.get_cmap(args.cmap)
-                cmap_x = np.linspace(0.0,1.0,len(domain_atoms))
-                sequential_colors = [cmap(x) for x in cmap_x]
+                sequential_colors = [cmap(x) for x in range(len(up.domains))]
 
             for i,coords in enumerate(domain_atoms):
                 domain_coords = coords
@@ -417,6 +411,11 @@ if __name__ == '__main__':
     # output coordinates and vector graphics
     out_prefix = args.save
     plt.savefig(out_prefix+'.'+args.format, transparent=True, pad_inches=0, bbox_inches='tight', dpi=300)
+
+    # output summary line
+    image_width = np.max(atom_coords[:,0]) - np.min(atom_coords[:,0])
+    image_height = np.max(atom_coords[:,1]) - np.min(atom_coords[:,1])
+    print('\t'.join(map(str, [args.pdb, args.save+'.'+args.format, image_height, image_width])))
 
     if args.export:
         # save 2d paths and protein metadata to a python pickle object0
