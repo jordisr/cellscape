@@ -14,6 +14,11 @@ Notes:
 
 '''
 
+# Some color combinations I like:
+# #FDB515' '#EE1F60' '#FDB515' '#3B7EA1'
+# #F9E37E' '#E17272' '#F9E37E' '#F9977E'
+# #276ab3' '#feb308' '#6fc276' '#ff9408'
+
 from Bio.PDB import *
 import numpy as np
 import matplotlib.pyplot as plt
@@ -26,13 +31,6 @@ from scipy.signal import savgol_filter
 from scipy import interpolate, linalg
 
 from parse_uniprot_xml import parse_xml
-
-def check_simplify(value):
-    fvalue = float(value)
-    if fvalue > 0 and fvalue < 2:
-        return True
-    else:
-        raise argparse.ArgumentTypeError("Simplify called with value of %s. Choose a value between 0-2." % value)
 
 parser = argparse.ArgumentParser(description='Scalable Vector Graphics for Macromolecular Structure',  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -73,7 +71,6 @@ parser.add_argument('--bot-spacer', type=float, default=0, help='Placeholder at 
 # arguments that need reworking
 parser.add_argument('--recenter', type=int, default=0, help='Recenter atomic coordinates on this residue')
 parser.add_argument('--topology', help='CSV-formatted file with topology boundaries')
-parser.add_argument('--simplify', default=0, help='Amount to simplify resulting polygons (experimental)', type=check_simplify)
 parser.add_argument('--scale-bar', action='store_true', default=False, help='Draw a scale bar (experimental)')
 
 args = parser.parse_args()
@@ -153,6 +150,35 @@ def rgb_to_cmap(h, w=0.3, name='test'):
     colors = [colorsys.hls_to_rgb(c[0], c[1], c[2]) for c in [c1, c2, c3]]
     return LinearSegmentedColormap.from_list(name, colors)
 
+def plot_polygon(poly, fc):
+    axs = plt.gca()
+    if isinstance(poly, sg.polygon.Polygon):
+        xs, ys = poly.exterior.xy
+        axs.fill(xs, ys, alpha=1, fc=fc, ec=args.ec, linewidth=args.linewidth, zorder=3)
+    elif isinstance(poly, sg.multipolygon.MultiPolygon):
+        for p in poly:
+            xs, ys = p.exterior.xy
+            axs.fill(xs, ys, alpha=1, fc=fc, ec=args.ec, linewidth=args.linewidth, zorder=3)
+    return 0
+
+def get_sequential_colors(n):
+    if len(args.c) > 1:
+        sequential_colors = args.c
+    else:
+        cmap = cm.get_cmap(args.cmap)
+        sequential_colors = [cmap(x) for x in range(n)]
+    return sequential_colors
+
+def get_sequential_cmap(n):
+    if len(args.c) > 1:
+        cmap_list = [hex_to_cmap(c) for c in args.c]
+    else:
+        #cmap_x = np.linspace(0.0,1.0, len(chain_selection)) # continuous cmap
+        #cmap_list = [rgb_to_cmap(cmap(x)) for x in cmap_x] # continuous cmap
+        cmap = cm.get_cmap(args.cmap)
+        cmap_list = [rgb_to_cmap(cmap(x)) for x in range(n)]
+    return cmap_list
+
 if __name__ == '__main__':
 
     parser = PDBParser()
@@ -197,11 +223,11 @@ if __name__ == '__main__':
             res_id = residue.get_full_id()[3][1]
             residue_to_atoms[chain][res_id] = np.array([list(r.get_vector()) for r in Selection.unfold_entities(residue,'A')])
 
+    # get mappings of residue to domain, empty if no UniProt data
+    residue_to_domains = dict()
+
     if args.uniprot:
         up = parse_xml(args.uniprot)[0]
-
-        # get mappings of residue to domain
-        residue_to_domains = dict()
         d = 0
         prev_domain = 'None'
         for row in up.domain_segments:
@@ -317,37 +343,13 @@ if __name__ == '__main__':
                 else:
                     atom_coords = np.append(atom_coords,coords,axis=0)
 
-        # draw outline in the back first (in progress)
-        space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in atom_coords])
-        try:
-            xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
-            axs.fill(xs, ys, alpha=0, fc='w', ec=args.ec, zorder=1)
-        except:
-            pass
-
-        # some colormaps I've tested
-        #cmap_list = [cm.get_cmap(x) for x in ['Blues', 'Oranges', 'Greens', 'Reds', 'Purples']]
-        #cmap_list = [hex_to_cmap(c) for c in ['#276ab3', '#feb308', '#6fc276', '#ff9408']]
-        #cmap_list = [hex_to_cmap(c) for c in ['#F9E37E', '#E17272', '#F9E37E', '#F9977E']]
-        #cmap_list = [hex_to_cmap(c) for c in ['#FDB515', '#EE1F60', '#FDB515', '#3B7EA1']]
-
         if args.color_by != 'same':
             if args.color_by == 'chain':
                 color_on_col = 0
+                cmap_list = get_sequential_cmap(len(chain_selection))
             elif args.color_by == 'domain':
                 color_on_col = 3
-
-            if len(args.c) > 1:
-                cmap_list = [hex_to_cmap(c) for c in args.c]
-            else:
-                cmap = cm.get_cmap(args.cmap)
-                #cmap_x = np.linspace(0.0,1.0, len(chain_selection)) # continuous cmap
-                #cmap_list = [rgb_to_cmap(cmap(x)) for x in cmap_x] # continuous cmap
-                if args.color_by == 'chain':
-                    cmap_list = [rgb_to_cmap(cmap(x)) for x in range(len(chain_selection))]
-                elif args.color_by == 'domain':
-                    # currently no different color for linker regions
-                    cmap_list = [rgb_to_cmap(cmap(x)) for x in range(len(up.domains))]
+                cmap_list = get_sequential_cmap(len(up.domains))
         else:
             cmap_list = [hex_to_cmap(args.c[0])]
             color_on_col = 0
@@ -358,7 +360,7 @@ if __name__ == '__main__':
             return (z-np.min(z_coord))/(np.max(z_coord)-np.min(z_coord))
 
         if args.occlude:
-
+            # currently only works with outlining overlapping chains
             res_data_occlusion = []
             region_polygons = [[] for i in range(len(chain_selection))]
             view_object = None
@@ -379,68 +381,37 @@ if __name__ == '__main__':
                         region_polygons[row[0]].append(space_filling.difference(view_object))
                         view_object = view_object.union(space_filling)
 
-            # check that overall view_object "shadow" makes sense
-            #xs, ys = view_object.exterior.xy
-            #axs.fill(xs, ys, alpha=1, fc='k', ec='k',zorder=3)
-
-            if len(args.c) > 1:
-                sequential_colors = args.c
-            else:
-                cmap = cm.get_cmap(args.cmap)
-                sequential_colors = [cmap(x) for x in range(len(chain_selection))]
-
+            sequential_colors = get_sequential_colors(len(chain_selection))
             for i, rp in enumerate(region_polygons):
                 merged = so.cascaded_union(rp)
-                if isinstance(merged, sg.polygon.Polygon):
-                    pass
-                    xs, ys = merged.exterior.xy
-                    axs.fill(xs, ys, alpha=1, fc=sequential_colors[i], ec='k',zorder=3)
-                elif isinstance(merged, sg.multipolygon.MultiPolygon):
-                    for p in merged:
-                        xs, ys = p.exterior.xy
-                        axs.fill(xs, ys, alpha=1, fc=sequential_colors[i], ec='k',zorder=3)
+                plot_polygon(merged, fc=sequential_colors[i % len(sequential_colors)])
+
         else:
             for row in sorted(res_data, key=lambda x: np.mean(x[2][:,2]), reverse=False):
                 coords = row[2]
                 res_color = cmap_list[row[color_on_col] % cmap_colors](rescale_coord(np.mean(coords[:,2])))
                 space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in coords])
-                xs, ys = space_filling.simplify(args.simplify, preserve_topology=False).exterior.xy
-                # ec='#202020' is a little lighter
-                axs.fill(xs, ys, alpha=1, fc=res_color, ec=args.ec, zorder=2, linewidth=args.linewidth)
+                plot_polygon(space_filling, fc=res_color)
 
     else:
         if args.outline_domains:
-            if len(args.c) > 1:
-                sequential_colors = args.c
-            else:
-                cmap = cm.get_cmap(args.cmap)
-                sequential_colors = [cmap(x) for x in range(len(up.domains))]
-
+            sequential_colors = get_sequential_colors(len(up_domains))
             for i,coords in enumerate(domain_atoms):
                 domain_coords = coords
                 space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
-                xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
-                #fx = savgol_filter(xs,11,2)
-                #fy = savgol_filter(ys,11,2)
-                #tck, u = interpolate.splprep([fx, fy],s=3)
-                #unew = np.arange(0, 1.01, 0.01)
-                #out = interpolate.splev(unew, tck)
-                axs.fill(xs, ys, alpha=1, fc=sequential_colors[i % len(sequential_colors)], ec='k',zorder=2)
+                plot_polygon(space_filling, fc=sequential_colors[i % len(sequential_colors)])
+
         else:
             space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in atom_coords])
-            xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
-            axs.fill(xs, ys, alpha=1, fc=args.c[0], ec=args.ec, zorder=1, linewidth=args.linewidth)
+            plot_polygon(space_filling, fc=args.c[0])
 
     if args.highlight:
         # draws those residues separately on top of previous polygons
-        #highlight_com = np.dot(np.array(list(highlight_res.values())),mat)
-        #plt.scatter(highlight_com[:,0],highlight_com[:,1], c='k')
         highlight_res = [residue_to_atoms[int(i)] for i in args.highlight]
         for v in highlight_res:
             res_coords = v
             space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in res_coords])
-            xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
-            axs.fill(xs, ys, alpha=1, fc='r', ec='k')
+            plot_polygon(space_filling, fc='r')
 
     if args.scale_bar:
         bar_length = 10
@@ -464,7 +435,7 @@ if __name__ == '__main__':
     if args.export:
         # save 2d paths and protein metadata to a python pickle object0
         space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in atom_coords])
-        xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
+        xs, ys = space_filling.exterior.xy
         outline = np.array([xs,ys])
 
         height = np.max(atom_coords[:,1]) - np.min(atom_coords[:,1])
@@ -484,7 +455,7 @@ if __name__ == '__main__':
             for i,coords in enumerate(domain_atoms):
                 domain_coords = coords
                 space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
-                xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
+                xs, ys = space_filling.exterior.xy
                 domain_paths.append((xs,ys))
             data['domain_paths'] = domain_paths
 
