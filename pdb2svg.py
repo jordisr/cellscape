@@ -52,6 +52,7 @@ parser.add_argument('--export', action='store_true', help='Export Python object 
 parser.add_argument('--residues', action='store_true', default=False, help='Draw residues separately and simulate surface rendering ')
 parser.add_argument('--color_by', default='same',  choices=['same', 'chain', 'domain'], help='Color protein by chain')
 parser.add_argument('--outline_domains', action='store_true', help='Outline each domain, implies --uniprot but not --residues')
+parser.add_argument('--occlude', action='store_true', default=False, help='Occlude residues that are not visible')
 
 # lower level graphics options
 parser.add_argument('--radius', default=1.5, help='Space-filling radius, in angstroms', type=float)
@@ -356,13 +357,56 @@ if __name__ == '__main__':
         def rescale_coord(z):
             return (z-np.min(z_coord))/(np.max(z_coord)-np.min(z_coord))
 
-        for row in sorted(res_data, key=lambda x: np.mean(x[2][:,2]), reverse=False):
-            coords = row[2]
-            res_color = cmap_list[row[color_on_col] % cmap_colors](rescale_coord(np.mean(coords[:,2])))
-            space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in coords])
-            xs, ys = space_filling.simplify(args.simplify, preserve_topology=False).exterior.xy
-            # ec='#202020' is a little lighter
-            axs.fill(xs, ys, alpha=1, fc=res_color, ec=args.ec, zorder=2, linewidth=args.linewidth)
+        if args.occlude:
+
+            res_data_occlusion = []
+            region_polygons = [[] for i in range(len(chain_selection))]
+            view_object = None
+            for row in reversed(sorted(res_data, key=lambda x: np.mean(x[2][:,2]))):
+                coords = row[2]
+                space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in coords])
+                if not view_object:
+                    view_object = space_filling
+                else:
+                    if view_object.disjoint(space_filling):
+                        res_data_occlusion.append(row)
+                        view_object = view_object.union(space_filling)
+                        region_polygons[row[0]].append(space_filling)
+                    elif view_object.contains(space_filling):
+                        pass
+                    else:
+                        res_data_occlusion.append(row)
+                        region_polygons[row[0]].append(space_filling.difference(view_object))
+                        view_object = view_object.union(space_filling)
+
+            # check that overall view_object "shadow" makes sense
+            #xs, ys = view_object.exterior.xy
+            #axs.fill(xs, ys, alpha=1, fc='k', ec='k',zorder=3)
+
+            if len(args.c) > 1:
+                sequential_colors = args.c
+            else:
+                cmap = cm.get_cmap(args.cmap)
+                sequential_colors = [cmap(x) for x in range(len(chain_selection))]
+
+            for i, rp in enumerate(region_polygons):
+                merged = so.cascaded_union(rp)
+                if isinstance(merged, sg.polygon.Polygon):
+                    pass
+                    xs, ys = merged.exterior.xy
+                    axs.fill(xs, ys, alpha=1, fc=sequential_colors[i], ec='k',zorder=3)
+                elif isinstance(merged, sg.multipolygon.MultiPolygon):
+                    for p in merged:
+                        xs, ys = p.exterior.xy
+                        axs.fill(xs, ys, alpha=1, fc=sequential_colors[i], ec='k',zorder=3)
+        else:
+            for row in sorted(res_data, key=lambda x: np.mean(x[2][:,2]), reverse=False):
+                coords = row[2]
+                res_color = cmap_list[row[color_on_col] % cmap_colors](rescale_coord(np.mean(coords[:,2])))
+                space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in coords])
+                xs, ys = space_filling.simplify(args.simplify, preserve_topology=False).exterior.xy
+                # ec='#202020' is a little lighter
+                axs.fill(xs, ys, alpha=1, fc=res_color, ec=args.ec, zorder=2, linewidth=args.linewidth)
 
     else:
         if args.outline_domains:
@@ -385,7 +429,7 @@ if __name__ == '__main__':
         else:
             space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in atom_coords])
             xs, ys = space_filling.simplify(args.simplify,preserve_topology=False).exterior.xy
-            axs.fill(xs, ys, alpha=1, fc=args.c[0], ec=args.ec, zorder=1)
+            axs.fill(xs, ys, alpha=1, fc=args.c[0], ec=args.ec, zorder=1, linewidth=args.linewidth)
 
     if args.highlight:
         # draws those residues separately on top of previous polygons
