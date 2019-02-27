@@ -395,7 +395,7 @@ if __name__ == '__main__':
 
     else:
         if args.outline_domains:
-            sequential_colors = get_sequential_colors(len(up_domains))
+            sequential_colors = get_sequential_colors(len(up.domains))
             for i,coords in enumerate(domain_atoms):
                 domain_coords = coords
                 space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
@@ -433,31 +433,10 @@ if __name__ == '__main__':
     print('\t'.join(map(str, [args.pdb, args.save+'.'+args.format, image_height, image_width])))
 
     if args.export:
-        # save 2d paths and protein metadata to a python pickle object0
-        space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in atom_coords])
-        xs, ys = space_filling.exterior.xy
-        outline = np.array([xs,ys])
-
-        height = np.max(atom_coords[:,1]) - np.min(atom_coords[:,1])
-        width = np.max(atom_coords[:,0]) - np.min(atom_coords[:,0])
-
-        data = {
-        'name': args.save,
-        'outline': outline,
-        'center': args.recenter,
-        'height': height,
-        'width':width,
-        'orientation':args.orientation
-        }
-
-        if args.outline_domains:
-            domain_paths = []
-            for i,coords in enumerate(domain_atoms):
-                domain_coords = coords
-                space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
-                xs, ys = space_filling.exterior.xy
-                domain_paths.append((xs,ys))
-            data['domain_paths'] = domain_paths
-
+        data = {'polygons':[], 'width':image_width, 'height':image_height}
+        import matplotlib
+        for o in plt.gca().findobj(matplotlib.patches.Polygon):
+            data['polygons'].append(o)
+            print(o)
         with open(args.save+'.pickle','wb') as f:
             pickle.dump(data, f)
