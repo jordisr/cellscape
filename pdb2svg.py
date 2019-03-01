@@ -69,7 +69,6 @@ parser.add_argument('--top-spacer', type=float, default=0, help='Placeholder at 
 parser.add_argument('--bot-spacer', type=float, default=0, help='Placeholder at bottom of structure (length in nm)')
 
 # arguments that need reworking
-parser.add_argument('--recenter', type=int, default=0, help='Recenter atomic coordinates on this residue')
 parser.add_argument('--topology', help='CSV-formatted file with topology boundaries')
 parser.add_argument('--scale-bar', action='store_true', default=False, help='Draw a scale bar (experimental)')
 
@@ -190,7 +189,6 @@ if __name__ == '__main__':
         chain_selection = [chain.id for chain in model.get_chains()]
     else:
         chain_selection = args.chain
-    untransformed_coords = np.concatenate([np.array([list(atom.get_vector()) for atom in model[chain].get_atoms()]) for chain in chain_selection])
 
     if args.view:
         # load view matrix
@@ -198,20 +196,14 @@ if __name__ == '__main__':
         model.transform(view_mat,[0,0,0])
     else:
         # align N to C terminus
+        untransformed_coords = np.concatenate([np.array([list(atom.get_vector()) for atom in model[chain].get_atoms()]) for chain in chain_selection])
         model.transform(align_n_to_c_mat(untransformed_coords, args.orientation),[0,0,0])
 
-    # recenter coordinates on residue (useful for orienting transmembrane proteins)
-    if args.recenter:
-        offset_res_id = args.recenter
-        # accessing chain by residue id seems to be problematic?
-        for residue in model.get_residues():
-            res_id = residue.get_full_id()[3][1]
-            if res_id == offset_res_id:
-                (offset_x, offset_y, _) = np.mean(np.array([list(r.get_vector()) for r in Selection.unfold_entities(residue,'A')]),axis=0)
-    else:
-        offset_x = untransformed_coords[0,0]
-        offset_y = untransformed_coords[0,1]
-        model.transform(np.identity(3), [-1*offset_x,-1*offset_y,0])
+    # recenter coordinates on lower left edge of bounding box
+    untransformed_coords = np.concatenate([np.array([list(atom.get_vector()) for atom in model[chain].get_atoms()]) for chain in chain_selection])
+    offset_x = np.min(untransformed_coords[:,0])*1.01 # Shapely bug: non-noded intersection
+    offset_y = np.min(untransformed_coords[:,1])
+    model.transform(np.identity(3), -1*np.array([offset_x, offset_y, 0]))
 
     atom_coords = np.concatenate([np.array([list(atom.get_vector()) for atom in model[chain].get_atoms()]) for chain in chain_selection])
 

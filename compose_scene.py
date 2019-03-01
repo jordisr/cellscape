@@ -12,10 +12,12 @@ import glob
 
 parser = argparse.ArgumentParser(description='Structure SVG compositing',  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--files', nargs='+', help='Pickled objects to load')
+parser.add_argument('--save', default='out', help='Prefix to save graphics')
 parser.add_argument('--offsets', nargs='+', default=[], help='Vertical offsets for each molecule specified manually')
+parser.add_argument('--padding', type=int, default=0, help='Horizontal padding to add between each molecule (in angstroms)')
 parser.add_argument('--axes', action='store_true', default=False, help='Draw x and y axes')
 parser.add_argument('--format', default='png', help='Format to save graphics', choices=['svg','pdf','png'])
-parser.add_argument('--membrane', action='store_true', default=False, help='Pickled objects to load')
+parser.add_argument('--membrane', action='store_true', default=False, help='Draw shaded membrane on X axis')
 args = parser.parse_args()
 
 def draw_membrane(width):
@@ -56,16 +58,13 @@ else:
     plt.gca().yaxis.set_major_locator(plt.NullLocator())
 
 # draw molecules
-spacer=30
-w=object_list[0]['width']/2
+w=0
 for i, o in enumerate(object_list):
-    w += o['width']/2
     for p in o['polygons']:
         xy = p.get_xy()
-        axs.fill(xy[:,0]+w, xy[:,1]+y_offsets[i], fc=p.get_facecolor(), ec='k', linewidth=0.5, zorder=2)
-    w += o['width']/2 + spacer
-
+        axs.fill(xy[:,0]+w, xy[:,1], fc=p.get_facecolor(), ec='k', linewidth=0.5, zorder=2)
+    w += o['width']+args.padding
 if args.membrane:
     draw_membrane(width=w)
 
-plt.savefig('compose.'+args.format, dpi=300)
+plt.savefig(args.save+'.'+args.format, dpi=300)
