@@ -27,8 +27,7 @@ from matplotlib.colors import LinearSegmentedColormap
 import shapely.geometry as sg
 import shapely.ops as so
 import os, sys, re, argparse, csv, pickle, colorsys
-from scipy.signal import savgol_filter
-from scipy import interpolate, linalg
+from scipy import linalg
 
 from parse_uniprot_xml import parse_xml
 

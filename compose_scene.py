@@ -1,13 +1,10 @@
 import numpy as np
-from scipy import linalg
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib import lines, text, cm
 import shapely.geometry as sg
 import shapely.ops as so
-import os, sys, re, argparse, csv, pickle
-from scipy.signal import savgol_filter
-from scipy import interpolate
+import os, sys, argparse, pickle
 import glob
 
 parser = argparse.ArgumentParser(description='Structure SVG compositing',  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
