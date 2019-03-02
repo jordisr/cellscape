@@ -57,7 +57,8 @@ def parse_xml(xmlpath):
             if feature.get('type') in ('topological domain','transmembrane region'):
                 begin = feature.find(ns+'location').find(ns+'begin').get('position')
                 end = feature.find(ns+'location').find(ns+'end').get('position')
-                sequence.add_topology(feature.get('description'),begin,end)
+                feature_description = feature.get('description').split(';')[0]
+                sequence.add_topology(feature_description, begin, end)
 
             # look for protein domains
             elif feature.get('type') == 'domain':

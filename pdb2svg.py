@@ -26,7 +26,7 @@ from matplotlib import lines, text, cm
 from matplotlib.colors import LinearSegmentedColormap
 import shapely.geometry as sg
 import shapely.ops as so
-import os, sys, re, argparse, csv, pickle, colorsys
+import os, sys, re, argparse, csv, pickle, colorsys, glob
 from scipy import linalg
 
 from parse_uniprot_xml import parse_xml
@@ -34,7 +34,7 @@ from parse_uniprot_xml import parse_xml
 parser = argparse.ArgumentParser(description='Scalable Vector Graphics for Macromolecular Structure',  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 # input pdb options
-parser.add_argument('--pdb', help='Input PDB file', required=True)
+parser.add_argument('--pdb', help='Input PDB file')
 parser.add_argument('--model', type=int, default=0, help='Model number in PDB to load')
 parser.add_argument('--chain', default=['all'], help='Chain(s) in structure to outline', nargs='+')
 
@@ -44,6 +44,7 @@ parser.add_argument('--uniprot', help='UniProt XML file to parse for sequence/do
 parser.add_argument('--save', default='out', help='Prefix to save graphics')
 parser.add_argument('--format', default='svg', help='Format to save graphics', choices=['svg','pdf','png'])
 parser.add_argument('--export', action='store_true', help='Export Python object with structural information')
+parser.add_argument('--look', help='Look in directory for structure .pdb, view matrix in .txt and UniProt .xml')
 
 # visual style options
 parser.add_argument('--residues', action='store_true', default=False, help='Draw residues separately and simulate surface rendering ')
@@ -177,8 +178,62 @@ def get_sequential_cmap(n):
         cmap_list = [rgb_to_cmap(cmap(x)) for x in range(n)]
     return cmap_list
 
+def get_residue_atoms(structure, residue):
+    return np.array([list(a.get_vector()) for a in structure[r]])
+
+def orientation_from_topology(topologies):
+    first_ex_flag = True
+    first_cy_flag = True
+    first_he_flag = True
+
+    for row in topologies:
+        (description, start, end) = row
+
+        if description == 'Extracellular' and first_ex_flag:
+            first_ex = (start, end)
+            first_ex_flag = False
+        elif description == 'Helical' and first_he_flag:
+            first_he = (start, end)
+            first_he_flag = False
+        elif description == 'Cytoplasmic' and first_cy_flag:
+            first_cy = (start, end)
+            first_cy_flag = False
+
+    if first_ex[0] < first_cy[0]:
+        orient_from_topo = 1
+    elif first_ex[0] > first_cy[0]:
+        orient_from_topo = -1
+
+    return(orient_from_topo)
+
 if __name__ == '__main__':
 
+    if args.look:
+        pdb_files = glob.glob(args.look+'/*.pdb')
+        xml_files = glob.glob(args.look+'/*.xml')
+        txt_files = glob.glob(args.look+'/*.txt')
+        assert(len(pdb_files) > 0 or args.pdb)
+        if len(xml_files) > 0:
+            args.pdb = pdb_files[0]
+        if len(xml_files) > 0:
+            args.uniprot = xml_files[0]
+        if len(txt_files) > 0:
+            args.view = txt_files[0]
+
+    # parse UniProt XML file if present
+    if args.uniprot:
+        up = parse_xml(args.uniprot)[0]
+    elif args.color_by == 'domain' or args.outline_domains:
+        sys.exit("Error: No domain information. Need to specify topology with UniProt XML file (--uniprot)")
+
+    # infer orientation of protein from UniProt topology, if present
+    if args.uniprot and len(up.topology) > 0:
+        print(up.topology)
+        orientation = orientation_from_topology(up.topology)
+    else:
+        orientation = args.orientation
+
+    # open PDB structure
     parser = PDBParser()
     structure = parser.get_structure('PDB', args.pdb)
     model = structure[args.model]
@@ -189,6 +244,7 @@ if __name__ == '__main__':
     else:
         chain_selection = args.chain
 
+    # apply rotation
     if args.view:
         # load view matrix
         view_mat = read_pymol_view(args.view)
@@ -196,7 +252,7 @@ if __name__ == '__main__':
     else:
         # align N to C terminus
         untransformed_coords = np.concatenate([np.array([list(atom.get_vector()) for atom in model[chain].get_atoms()]) for chain in chain_selection])
-        model.transform(align_n_to_c_mat(untransformed_coords, args.orientation),[0,0,0])
+        model.transform(align_n_to_c_mat(untransformed_coords, orientation),[0,0,0])
 
     # recenter coordinates on lower left edge of bounding box
     untransformed_coords = np.concatenate([np.array([list(atom.get_vector()) for atom in model[chain].get_atoms()]) for chain in chain_selection])
@@ -204,6 +260,20 @@ if __name__ == '__main__':
     offset_y = np.min(untransformed_coords[:,1])
     model.transform(np.identity(3), -1*np.array([offset_x, offset_y, 0]))
 
+    # calculate vertical offset for transmembrane proteins
+    if args.uniprot and len(up.topology) > 0:
+        topologies = up.topology
+        tm_coordinates = []
+        for t in topologies:
+            (description, start, end) = t
+            if description == 'Helical':
+                for r in range(start, end+1):
+                    tm_coordinates.append(get_residue_atoms(model[chain_selection[0]], r))
+        tm_coordinates = np.concatenate(np.array(tm_coordinates))
+        tm_com_y = np.mean(tm_coordinates[:,1])
+        model.transform(np.identity(3), -1*np.array([0, tm_com_y+20, 0]))
+
+    # global list of all atoms
     atom_coords = np.concatenate([np.array([list(atom.get_vector()) for atom in model[chain].get_atoms()]) for chain in chain_selection])
 
     # dict of dicts holding residue to np.array of atomic coordinates
@@ -214,11 +284,10 @@ if __name__ == '__main__':
             res_id = residue.get_full_id()[3][1]
             residue_to_atoms[chain][res_id] = np.array([list(r.get_vector()) for r in Selection.unfold_entities(residue,'A')])
 
-    # get mappings of residue to domain, empty if no UniProt data
-    residue_to_domains = dict()
+    if args.uniprot and len(up.domains) > 0:
 
-    if args.uniprot:
-        up = parse_xml(args.uniprot)[0]
+        # get mappings of residue to domain, empty if no UniProt data
+        residue_to_domains = dict()
         d = 0
         prev_domain = 'None'
         for row in up.domain_segments:
@@ -240,51 +309,6 @@ if __name__ == '__main__':
                 else:
                     print('WARNING: Missing residue',r,'in structure!')
             domain_atoms.append(np.concatenate(this_domain))
-
-    elif args.color_by == 'domain' or args.outline_domains:
-        sys.exit("Error: No domain information. Need to specify topology with UniProt XML file (--uniprot)")
-
-    if args.topology:
-        # not currently used for automatic orienting
-        topologies = []
-        first_ex_flag = True
-        first_cy_flag = True
-        first_he_flag = True
-        with open(args.topology) as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                (start,end,description) = (int(row['res_start']),int(row['res_end']),row['description'])
-                topologies.append((start,end,description))
-                if description == 'Extracellular' and first_ex_flag:
-                    first_ex = (start, end)
-                    first_ex_flag = False
-                elif description == 'Helical' and first_he_flag:
-                    first_he = (start, end)
-                    first_he_flag = False
-                elif description == 'Cytoplasmic' and first_cy_flag:
-                    first_cy = (start, end)
-                    first_cy_flag = False
-        if first_ex[0] < first_cy[0]:
-            orient_from_topo = -1
-        elif first_ex[0] > first_cy[0]:
-            orient_from_topo = 1
-        if orient_from_topo == 1:
-            tm_start = first_cy[1]
-        elif orient_from_topo == -1:
-            tm_start = first_cy[0]
-
-        def safe_bounds(n, residue_to_atoms):
-            res_in_struct = list(residue_to_atoms.keys())
-            if n < np.min(res_in_struct):
-                return(np.min(res_in_struct))
-            elif n > np.max(res_in_struct):
-                return(np.max(res_in_struct))
-
-        offset_x = residue_to_atoms[safe_bounds(tm_start, residue_to_atoms)][0][0]
-        offset_y = residue_to_atoms[safe_bounds(tm_start, residue_to_atoms)][0][1]
-
-        chain.transform(np.identity(3), [-1*offset_x,-1*offset_y,0])
-        atom_coords = np.array([list(atom.get_vector()) for atom in chain.get_atoms()])
 
     # fire up a pyplot
     fig, axs = plt.subplots()
