@@ -48,7 +48,7 @@ parser.add_argument('--look', help='Look in directory for structure .pdb, view m
 
 # visual style options
 parser.add_argument('--residues', action='store_true', default=False, help='Draw residues separately and simulate surface rendering ')
-parser.add_argument('--color_by', default='same',  choices=['same', 'chain', 'domain'], help='Color protein by chain')
+parser.add_argument('--color_by', default='same',  choices=['same', 'chain', 'domain', 'topology'], help='Color residues by which property')
 parser.add_argument('--outline_domains', action='store_true', help='Outline each domain, implies --uniprot but not --residues')
 parser.add_argument('--occlude', action='store_true', default=False, help='Occlude residues that are not visible')
 
@@ -178,7 +178,8 @@ def get_sequential_cmap(n):
     return cmap_list
 
 def get_residue_atoms(structure, residue):
-    return np.array([list(a.get_vector()) for a in structure[r]])
+    #return np.array([list(a.get_vector()) for a in structure[r]])
+    return np.array([list(a.get_vector()) for a in Selection.unfold_entities(structure[residue],'A')])
 
 def orientation_from_topology(topologies):
     first_ex_flag = True
@@ -262,12 +263,15 @@ if __name__ == '__main__':
     # calculate vertical offset for transmembrane proteins
     if args.uniprot and len(up.topology) > 0:
         topologies = up.topology
+        residue_to_topologies = dict()
         tm_coordinates = []
         for t in topologies:
             (description, start, end) = t
             if description == 'Helical':
                 for r in range(start, end+1):
                     tm_coordinates.append(get_residue_atoms(model[chain_selection[0]], r))
+            for r in range(start, end+1):
+                residue_to_topologies[r] = description
         tm_coordinates = np.concatenate(np.array(tm_coordinates))
         tm_com_y = np.mean(tm_coordinates[:,1])
         model.transform(np.identity(3), -1*np.array([0, tm_com_y+20, 0]))
@@ -281,7 +285,8 @@ if __name__ == '__main__':
         residue_to_atoms[chain] = dict()
         for residue in model[chain].get_residues():
             res_id = residue.get_full_id()[3][1]
-            residue_to_atoms[chain][res_id] = np.array([list(r.get_vector()) for r in Selection.unfold_entities(residue,'A')])
+            if res_id in model[chain]:
+                residue_to_atoms[chain][res_id] = get_residue_atoms(model[chain], res_id)
 
     if args.uniprot and len(up.domains) > 0:
 
@@ -351,7 +356,8 @@ if __name__ == '__main__':
                     domain_id = residue_to_domains.get(res_id, "")
                 else:
                     domain_id = ""
-                res_data.append((chain_i, res_id, coords, domain_id))
+                topology_id = {'':3, 'Extracellular':0, 'Helical':1, 'Cytoplasmic':2}[residue_to_topologies.get(res_id, "")]
+                res_data.append((chain_i, res_id, coords, domain_id, topology_id))
                 if len(atom_coords) == 0:
                     atom_coords = coords
                 else:
@@ -364,6 +370,9 @@ if __name__ == '__main__':
             elif args.color_by == 'domain':
                 color_on_col = 3
                 cmap_list = get_sequential_cmap(len(up.domains))
+            elif args.color_by == 'topology':
+                color_on_col = 4
+                cmap_list = get_sequential_cmap(4)
         else:
             cmap_list = [hex_to_cmap(args.c[0])]
             color_on_col = 0
