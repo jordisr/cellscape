@@ -69,8 +69,7 @@ parser.add_argument('--top-spacer', type=float, default=0, help='Placeholder at 
 parser.add_argument('--bot-spacer', type=float, default=0, help='Placeholder at bottom of structure (length in nm)')
 
 # arguments that need reworking
-parser.add_argument('--topology', help='CSV-formatted file with topology boundaries')
-parser.add_argument('--scale-bar', action='store_true', default=False, help='Draw a scale bar (experimental)')
+parser.add_argument('--scale-bar', action='store_true', default=False, help='Draw a scale bar')
 
 args = parser.parse_args()
 
@@ -348,10 +347,10 @@ if __name__ == '__main__':
         res_data = []
         for chain_i, chain in enumerate(chain_selection):
             for res_id, coords in residue_to_atoms[chain].items():
-                if not args.uniprot:
-                    domain_id = ""
-                else:
+                if args.uniprot and len(up.domains) > 0:
                     domain_id = residue_to_domains.get(res_id, "")
+                else:
+                    domain_id = ""
                 res_data.append((chain_i, res_id, coords, domain_id))
                 if len(atom_coords) == 0:
                     atom_coords = coords
