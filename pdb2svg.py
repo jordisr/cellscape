@@ -213,7 +213,7 @@ if __name__ == '__main__':
         xml_files = glob.glob(args.look+'/*.xml')
         txt_files = glob.glob(args.look+'/*.txt')
         assert(len(pdb_files) > 0 or args.pdb)
-        if len(xml_files) > 0:
+        if len(pdb_files) > 0:
             args.pdb = pdb_files[0]
         if len(xml_files) > 0:
             args.uniprot = xml_files[0]
@@ -356,7 +356,10 @@ if __name__ == '__main__':
                     domain_id = residue_to_domains.get(res_id, "")
                 else:
                     domain_id = ""
-                topology_id = {'':3, 'Extracellular':0, 'Helical':1, 'Cytoplasmic':2}[residue_to_topologies.get(res_id, "")]
+                if args.uniprot and len(up.topology) > 0:
+                    topology_id = {'':3, 'Extracellular':0, 'Helical':1, 'Cytoplasmic':2}[residue_to_topologies.get(res_id, "")]
+                else:
+                    topology_id = ""
                 res_data.append((chain_i, res_id, coords, domain_id, topology_id))
                 if len(atom_coords) == 0:
                     atom_coords = coords

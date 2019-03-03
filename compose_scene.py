@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib import lines, text, cm
@@ -17,10 +18,10 @@ parser.add_argument('--format', default='png', help='Format to save graphics', c
 parser.add_argument('--membrane', action='store_true', default=False, help='Draw shaded membrane on X axis')
 args = parser.parse_args()
 
-def draw_membrane(width):
+def draw_membrane(width, height=40):
     axs = plt.gca()
     membrane_box = mpatches.FancyBboxPatch(
-        [-100, 0], 2*width, -40,
+        [-100, 0], 2*width, -1*height,
         boxstyle=mpatches.BoxStyle("Round", pad=0.02),
         edgecolor='none',facecolor='#DDD5C7',alpha=0.5, zorder=1)
     axs.add_patch(membrane_box)
@@ -37,6 +38,10 @@ if len(args.offsets) > 0:
     y_offsets = list(map(float, args.offsets))
 else:
     y_offsets = np.zeros(len(object_list))
+
+# set font options
+font_options = {'family':'Arial', 'weight':'normal', 'size':10}
+matplotlib.rc('font', **font_options)
 
 # set up plot
 fig, axs = plt.subplots()
@@ -57,9 +62,14 @@ else:
 # draw molecules
 w=0
 for i, o in enumerate(object_list):
+    # infer if --residues and use lighter line width
+    if len(o['polygons']) > 20:
+        lw=0.1
+    else:
+        lw=0.5
     for p in o['polygons']:
         xy = p.get_xy()
-        axs.fill(xy[:,0]+w, xy[:,1], fc=p.get_facecolor(), ec='k', linewidth=0.5, zorder=2)
+        axs.fill(xy[:,0]+w, xy[:,1], fc=p.get_facecolor(), ec='k', linewidth=lw, zorder=2)
     w += o['width']+args.padding
 if args.membrane:
     draw_membrane(width=w)
