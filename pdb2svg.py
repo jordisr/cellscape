@@ -30,6 +30,7 @@ import os, sys, re, argparse, csv, pickle, colorsys, glob
 from scipy import linalg
 
 from parse_uniprot_xml import parse_xml
+import parse_alignment
 
 parser = argparse.ArgumentParser(description='Scalable Vector Graphics for Macromolecular Structure',  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -40,17 +41,18 @@ parser.add_argument('--chain', default=['all'], help='Chain(s) in structure to o
 
 # general input/output options
 parser.add_argument('--view', help='File with output from PyMol get_view')
-parser.add_argument('--uniprot', help='UniProt XML file to parse for sequence/domain/topology information')
+parser.add_argument('--uniprot', nargs='+', help='UniProt XML file to parse for sequence/domain/topology information')
 parser.add_argument('--save', default='out', help='Prefix to save graphics')
 parser.add_argument('--format', default='svg', help='Format to save graphics', choices=['svg','pdf','png'])
 parser.add_argument('--export', action='store_true', help='Export Python object with structural information')
 parser.add_argument('--look', help='Look in directory for structure .pdb, view matrix in .txt and UniProt .xml')
+parser.add_argument('--align', action='store_true', default=False, help='Ignore PDB residue numbering and align to UniProt sequence to find offset')
+parser.add_argument('--only_annotated', action='store_true', default=False, help='Ignore regions without UniProt annotations')
 
 # visual style options
-parser.add_argument('--residues', action='store_true', default=False, help='Draw residues separately and simulate surface rendering ')
-parser.add_argument('--color_by', default='same',  choices=['same', 'chain', 'domain', 'topology'], help='Color residues by which property')
-parser.add_argument('--outline_domains', action='store_true', help='Outline each domain, implies --uniprot but not --residues')
-parser.add_argument('--occlude', action='store_true', default=False, help='Occlude residues that are not visible')
+parser.add_argument('--outline_by',  default='all',  choices=['all', 'chain', 'domain', 'topology', 'residue'], help='*')
+parser.add_argument('--color_by', default='same',  choices=['same', 'chain', 'domain', 'topology'], help='Color residues by attribute (if --outline_by residues is selected)')
+parser.add_argument('--occlude', action='store_true', default=False, help='Occlude residues that are not visible and draw outlines using visible residues only')
 
 # lower level graphics options
 parser.add_argument('--radius', default=1.5, help='Space-filling radius, in angstroms', type=float)
@@ -164,14 +166,15 @@ def get_sequential_colors(n):
         sequential_colors = args.c
     else:
         cmap = cm.get_cmap(args.cmap)
-        sequential_colors = [cmap(x) for x in range(n)]
+        # sequential_colors = [cmap(x) for x in range(n)]
+        sequential_colors = [cmap(x) for x in np.linspace(0.0,1.0, n)]
     return sequential_colors
 
 def get_sequential_cmap(n):
     if len(args.c) > 1:
         cmap_list = [hex_to_cmap(c) for c in args.c]
     else:
-        #cmap_x = np.linspace(0.0,1.0, len(chain_selection)) # continuous cmap
+        #cmap_x = np.linspace(0.0,1.0, len(chain_list)) # continuous cmap
         #cmap_list = [rgb_to_cmap(cmap(x)) for x in cmap_x] # continuous cmap
         cmap = cm.get_cmap(args.cmap)
         cmap_list = [rgb_to_cmap(cmap(x)) for x in range(n)]
@@ -180,6 +183,10 @@ def get_sequential_cmap(n):
 def get_residue_atoms(structure, residue):
     #return np.array([list(a.get_vector()) for a in structure[r]])
     return np.array([list(a.get_vector()) for a in Selection.unfold_entities(structure[residue],'A')])
+
+def get_chain_sequence(chain):
+    ppb = PPBuilder()
+    return  str(ppb.build_peptides(chain)[0].get_sequence())
 
 def orientation_from_topology(topologies):
     first_ex_flag = True
@@ -206,8 +213,33 @@ def orientation_from_topology(topologies):
 
     return(orient_from_topo)
 
+class residue_data:
+    def __init__(self, structure, chain, name):
+        self.structure = structure
+        self.chain = chain
+        self.name = name
+        self.topology = None
+        self.domain = None
+        self.visible = True
+    def get_xyz(self):
+        self.xyz = get_residue_atoms(self.structure, self.name)
+        return self.xyz
+    def __repr__(self):
+        return '\t'.join(list(map(str, [self.chain, self.name, self.domain, self.topology])))
+
+def group_by(obj, attr):
+    d = dict()
+    for o in obj:
+        a = getattr(o, attr)
+        if a in d:
+            d[a].append(o)
+        else:
+            d[a] = [o]
+    return d
+
 if __name__ == '__main__':
 
+    # look in given directory for relevant files
     if args.look:
         pdb_files = glob.glob(args.look+'/*.pdb')
         xml_files = glob.glob(args.look+'/*.xml')
@@ -216,15 +248,77 @@ if __name__ == '__main__':
         if len(pdb_files) > 0:
             args.pdb = pdb_files[0]
         if len(xml_files) > 0:
-            args.uniprot = xml_files[0]
+            args.uniprot = xml_files[:1]
         if len(txt_files) > 0:
             args.view = txt_files[0]
 
     # parse UniProt XML file if present
     if args.uniprot:
-        up = parse_xml(args.uniprot)[0]
-    elif args.color_by == 'domain' or args.outline_domains:
+        up = parse_xml(args.uniprot[0])[0]
+        uniprot_list = [up]
+    elif args.color_by == 'domain' or args.outline_by == 'domain':
         sys.exit("Error: No domain information. Need to specify topology with UniProt XML file (--uniprot)")
+
+    # open PDB structure
+    parser = PDBParser()
+    pdb_name = os.path.basename(args.pdb)
+    structure = parser.get_structure(pdb_name, args.pdb)
+    model = structure[args.model]
+
+    # select desired chains
+    if args.chain[0] == 'all':
+        chain_list = [chain.id for chain in model.get_chains()]
+    else:
+        chain_list = args.chain
+
+    if args.uniprot:
+        if args.align or len(args.uniprot) > 1:
+            exit()
+            for up in uniprot_list:
+                pass # just testing now
+                pool_seqs = []
+                # sequences from PDB
+                for chain in chain_list:
+                    pool_seqs.append((chain, get_chain_sequence(model[chain])))
+                # sequence from uniprot
+                if args.uniprot:
+                    pool_seqs.append((up.name, up.sequence))
+                parse_alignment.align_all_pairs(pool_seqs)
+        else:
+            chain_to_up = (chain_list[0], uniprot_list[0], 0)
+
+    # dict of dicts holding residue objects
+    residues = dict()
+    for chain in chain_list:
+        residues[chain] = dict()
+        for res in model[chain].get_residues():
+            res_id = res.get_full_id()[3][1]
+            if res_id in model[chain]:
+                residues[chain][res_id] = residue_data(model[chain], chain, res_id)
+
+    # read in domains and topology
+    if args.uniprot:
+        for up in uniprot_list:
+            chain = chain_to_up[0]
+            offset = chain_to_up[2]
+
+            if len(up.domains) > 0:
+                print(up.domains)
+                for row in up.domains:
+                    (name, start, end) = row
+                    for r in range(start, end+1):
+                        if (r+offset) in residues[chain]:
+                            residues[chain][r+offset].domain = name
+
+            if len(up.topology) > 0:
+                print(up.topology)
+                for row in up.topology:
+                    (name, start, end) = row
+                    for r in range(start, end+1):
+                        if (r+offset) in residues[chain]:
+                            residues[chain][r+offset].topology = name
+
+################################################################################
 
     # infer orientation of protein from UniProt topology, if present
     if args.uniprot and len(up.topology) > 0:
@@ -233,17 +327,6 @@ if __name__ == '__main__':
     else:
         orientation = args.orientation
 
-    # open PDB structure
-    parser = PDBParser()
-    structure = parser.get_structure('PDB', args.pdb)
-    model = structure[args.model]
-
-    # select desired chains
-    if args.chain[0] == 'all':
-        chain_selection = [chain.id for chain in model.get_chains()]
-    else:
-        chain_selection = args.chain
-
     # apply rotation
     if args.view:
         # load view matrix
@@ -251,68 +334,32 @@ if __name__ == '__main__':
         model.transform(view_mat,[0,0,0])
     else:
         # align N to C terminus
-        untransformed_coords = np.concatenate([np.array([list(atom.get_vector()) for atom in model[chain].get_atoms()]) for chain in chain_selection])
+        untransformed_coords = np.concatenate([np.array([list(atom.get_vector()) for atom in model[chain].get_atoms()]) for chain in chain_list])
         model.transform(align_n_to_c_mat(untransformed_coords, orientation),[0,0,0])
 
     # recenter coordinates on lower left edge of bounding box
-    untransformed_coords = np.concatenate([np.array([list(atom.get_vector()) for atom in model[chain].get_atoms()]) for chain in chain_selection])
+    untransformed_coords = np.concatenate([np.array([list(atom.get_vector()) for atom in model[chain].get_atoms()]) for chain in chain_list])
     offset_x = np.min(untransformed_coords[:,0])*1.01 # Shapely bug: non-noded intersection
     offset_y = np.min(untransformed_coords[:,1])
     model.transform(np.identity(3), -1*np.array([offset_x, offset_y, 0]))
 
     # calculate vertical offset for transmembrane proteins
-    if args.uniprot and len(up.topology) > 0:
-        topologies = up.topology
-        residue_to_topologies = dict()
+    if args.uniprot:
         tm_coordinates = []
-        for t in topologies:
-            (description, start, end) = t
-            if description == 'Helical':
-                for r in range(start, end+1):
-                    tm_coordinates.append(get_residue_atoms(model[chain_selection[0]], r))
-            for r in range(start, end+1):
-                residue_to_topologies[r] = description
-        tm_coordinates = np.concatenate(np.array(tm_coordinates))
-        tm_com_y = np.mean(tm_coordinates[:,1])
-        model.transform(np.identity(3), -1*np.array([0, tm_com_y+20, 0]))
+        for chain in chain_list:
+            for res_id in residues[chain]:
+                res = residues[chain][res_id]
+                if res.topology == "Helical":
+                    tm_coordinates.append(res.get_xyz())
+        if len(tm_coordinates) > 0:
+            tm_coordinates = np.concatenate(np.array(tm_coordinates))
+            tm_com_y = np.mean(tm_coordinates[:,1])
+            model.transform(np.identity(3), -1*np.array([0, tm_com_y+20, 0]))
 
     # global list of all atoms
-    atom_coords = np.concatenate([np.array([list(atom.get_vector()) for atom in model[chain].get_atoms()]) for chain in chain_selection])
+    atom_coords = np.concatenate([np.array([list(atom.get_vector()) for atom in model[chain].get_atoms()]) for chain in chain_list])
 
-    # dict of dicts holding residue to np.array of atomic coordinates
-    residue_to_atoms = dict()
-    for chain in chain_selection:
-        residue_to_atoms[chain] = dict()
-        for residue in model[chain].get_residues():
-            res_id = residue.get_full_id()[3][1]
-            if res_id in model[chain]:
-                residue_to_atoms[chain][res_id] = get_residue_atoms(model[chain], res_id)
-
-    if args.uniprot and len(up.domains) > 0:
-
-        # get mappings of residue to domain, empty if no UniProt data
-        residue_to_domains = dict()
-        d = 0
-        prev_domain = 'None'
-        for row in up.domain_segments:
-            (name, start, end) = row
-            if prev_domain != 'None':
-                d += 1
-            for r in range(start, end+1):
-                residue_to_domains[r] = d
-            prev_domain = name
-
-        # retrieve domain residues and coordinates
-        domain_atoms = []
-        for row in up.domains:
-            (name, start, end) = row
-            this_domain = []
-            for r in range(start, end+1):
-                if r in residue_to_atoms[chain_selection[0]]:
-                    this_domain.append(residue_to_atoms[chain_selection[0]][r])
-                else:
-                    print('WARNING: Missing residue',r,'in structure!')
-            domain_atoms.append(np.concatenate(this_domain))
+################################################################################
 
     # fire up a pyplot
     fig, axs = plt.subplots()
@@ -347,89 +394,95 @@ if __name__ == '__main__':
         axs.add_line(bot_spacer)
 
     # main drawing routines
-    if args.residues:
-        atom_coords = np.array([])
-        res_data = []
-        for chain_i, chain in enumerate(chain_selection):
-            for res_id, coords in residue_to_atoms[chain].items():
-                if args.uniprot and len(up.domains) > 0:
-                    domain_id = residue_to_domains.get(res_id, "")
-                else:
-                    domain_id = ""
-                if args.uniprot and len(up.topology) > 0:
-                    topology_id = {'':3, 'Extracellular':0, 'Helical':1, 'Cytoplasmic':2}[residue_to_topologies.get(res_id, "")]
-                else:
-                    topology_id = ""
-                res_data.append((chain_i, res_id, coords, domain_id, topology_id))
-                if len(atom_coords) == 0:
-                    atom_coords = coords
-                else:
-                    atom_coords = np.append(atom_coords,coords,axis=0)
-
-        if args.color_by != 'same':
-            if args.color_by == 'chain':
-                color_on_col = 0
-                cmap_list = get_sequential_cmap(len(chain_selection))
-            elif args.color_by == 'domain':
-                color_on_col = 3
-                cmap_list = get_sequential_cmap(len(up.domains))
-            elif args.color_by == 'topology':
-                color_on_col = 4
-                cmap_list = get_sequential_cmap(4)
-        else:
-            cmap_list = [hex_to_cmap(args.c[0])]
-            color_on_col = 0
-        cmap_colors = len(cmap_list)
-
-        z_coord = atom_coords[:,2]
-        def rescale_coord(z):
-            return (z-np.min(z_coord))/(np.max(z_coord)-np.min(z_coord))
-
-        if args.occlude:
-            # currently only works with outlining overlapping chains
-            res_data_occlusion = []
-            region_polygons = [[] for i in range(len(chain_selection))]
-            view_object = None
-            for row in reversed(sorted(res_data, key=lambda x: np.mean(x[2][:,2]))):
-                coords = row[2]
-                space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in coords])
-                if not view_object:
-                    view_object = space_filling
-                else:
-                    if view_object.disjoint(space_filling):
-                        res_data_occlusion.append(row)
-                        view_object = view_object.union(space_filling)
-                        region_polygons[row[0]].append(space_filling)
-                    elif view_object.contains(space_filling):
-                        pass
-                    else:
-                        res_data_occlusion.append(row)
-                        region_polygons[row[0]].append(space_filling.difference(view_object))
-                        view_object = view_object.union(space_filling)
-
-            sequential_colors = get_sequential_colors(len(chain_selection))
-            for i, rp in enumerate(region_polygons):
-                merged = so.cascaded_union(rp)
-                plot_polygon(merged, fc=sequential_colors[i % len(sequential_colors)])
-
-        else:
-            for row in sorted(res_data, key=lambda x: np.mean(x[2][:,2]), reverse=False):
-                coords = row[2]
-                res_color = cmap_list[row[color_on_col] % cmap_colors](rescale_coord(np.mean(coords[:,2])))
-                space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in coords])
-                plot_polygon(space_filling, fc=res_color)
+    if args.outline_by == 'all':
+        space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in atom_coords])
+        plot_polygon(space_filling, fc=args.c[0])
 
     else:
-        if args.outline_domains:
-            sequential_colors = get_sequential_colors(len(up.domains))
-            for i,coords in enumerate(domain_atoms):
-                domain_coords = coords
-                space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in domain_coords])
-                plot_polygon(space_filling, fc=sequential_colors[i % len(sequential_colors)])
+        # compile master list of residues
+        res_data = []
+        for chain in chain_list:
+            for res in residues[chain].values():
+                res_data.append(res)
+                res.get_xyz()
+        res_data = sorted(res_data, key=lambda res: np.mean(res.xyz[:,2]))
+        atom_coords = np.concatenate([r.xyz for r in res_data])
 
-        else:
-            space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in atom_coords])
-            plot_polygon(space_filling, fc=args.c[0])
+        if args.outline_by == 'residue':
+            if args.color_by != 'same':
+                residue_groups = group_by(res_data, args.color_by)
+                number_groups = len(residue_groups.keys())
+                cmap_list = get_sequential_cmap(number_groups)
+                cmap_colors = len(cmap_list)
+                color_dict = {}
+                for i, k in enumerate(residue_groups):
+                    color_dict[k] = cmap_list[i % cmap_colors]
+            else:
+                cmap = hex_to_cmap(args.c[0])
+
+            # set up coloring base
+            z_coord = atom_coords[:,2]
+            def rescale_coord(z):
+                return (z-np.min(z_coord))/(np.max(z_coord)-np.min(z_coord))
+
+            if args.occlude:
+                view_object = None
+                for res in reversed(res_data):
+                    coords = res.xyz
+                    space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in coords])
+                    if not view_object:
+                        view_object = space_filling
+                    else:
+                        if view_object.contains(space_filling):
+                            res.visible = False
+                        else:
+                            view_object = view_object.union(space_filling)
+
+            for res in res_data:
+                if res.visible:
+                    coords = res.xyz
+                    if args.color_by != 'same':
+                        cmap = color_dict[getattr(res, args.color_by)]
+                    res_color = cmap(rescale_coord(np.mean(coords[:,2])))
+                    space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in coords])
+                    plot_polygon(space_filling, fc=res_color)
+
+        elif args.outline_by in ['domain', 'topology', 'chain']:
+            residue_groups = group_by(res_data, args.outline_by)
+            if args.occlude:
+                region_polygons = {c:[] for c in residue_groups.keys()}
+                view_object = None
+                for res in reversed(res_data):
+                    coords = res.xyz
+                    if not args.only_annotated or getattr(res, args.outline_by) is not None:
+                        space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in coords])
+                        if not view_object:
+                            view_object = space_filling
+                        else:
+                            if view_object.disjoint(space_filling):
+                                view_object = view_object.union(space_filling)
+                                region_polygons[getattr(res, args.outline_by)].append(space_filling)
+                            elif view_object.contains(space_filling):
+                                pass
+                            else:
+                                region_polygons[getattr(res, args.outline_by)].append(space_filling.difference(view_object))
+                                view_object = view_object.union(space_filling)
+
+                sequential_colors = get_sequential_colors(len(residue_groups))
+                for i, (region_name, region_polygon) in enumerate(region_polygons.items()):
+                    if not args.only_annotated or region_name is not None:
+                        merged = so.cascaded_union(region_polygon)
+                        plot_polygon(merged, fc=sequential_colors[i % len(sequential_colors)])
+            else:
+                residue_groups = group_by(res_data, args.outline_by)
+                sequential_colors = get_sequential_colors(len(residue_groups.keys()))
+                print(len(residue_groups.keys()))
+                for group_i, (group_name, group_res) in enumerate(residue_groups.items()):
+                    if not args.only_annotated or group_name is not None:
+                        group_coords = np.concatenate([r.xyz for r in group_res])
+                        space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in group_coords])
+                        print(group_i, group_name)
+                        plot_polygon(space_filling, fc=sequential_colors[group_i % len(sequential_colors)])
 
     if args.highlight:
         # draws those residues separately on top of previous polygons
@@ -448,6 +501,8 @@ if __name__ == '__main__':
         # legend for scale bar
         #legend = text.Text(bar_pos_x,bar_pos_y+bar_length, '1 nm', ha='left', va='bottom', axes=axs)
         #axs.add_artist(legend)
+
+################################################################################
 
     # output coordinates and vector graphics
     out_prefix = args.save
