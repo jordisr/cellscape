@@ -16,6 +16,7 @@ parser.add_argument('--padding', type=int, default=0, help='Horizontal padding t
 parser.add_argument('--axes', action='store_true', default=False, help='Draw x and y axes')
 parser.add_argument('--format', default='png', help='Format to save graphics', choices=['svg','pdf','png'])
 parser.add_argument('--membrane', action='store_true', default=False, help='Draw shaded membrane on X axis')
+parser.add_argument('--dpi', type=int, default=300, help='DPI to use if exporting to raster formats (i.e. PNG)')
 args = parser.parse_args()
 
 def draw_membrane(width, height=40):
@@ -23,7 +24,7 @@ def draw_membrane(width, height=40):
     membrane_box = mpatches.FancyBboxPatch(
         [-100, 0], 2*width, -1*height,
         boxstyle=mpatches.BoxStyle("Round", pad=0.02),
-        edgecolor='none',facecolor='#DDD5C7',alpha=0.5, zorder=1)
+        facecolor='#DDD5C7', alpha=1, zorder=2)
     axs.add_patch(membrane_box)
 
 # read in saved Python objects
@@ -63,15 +64,15 @@ else:
 w=0
 for i, o in enumerate(object_list):
     # infer if --residues and use lighter line width
-    if len(o['polygons']) > 20:
+    if len(o['polygons']) > 50:
         lw=0.1
     else:
         lw=0.5
     for p in o['polygons']:
         xy = p.get_xy()
-        axs.fill(xy[:,0]+w, xy[:,1], fc=p.get_facecolor(), ec='k', linewidth=lw, zorder=2)
+        axs.fill(xy[:,0]+w, xy[:,1], fc=p.get_facecolor(), ec='k', linewidth=lw, zorder=3)
     w += o['width']+args.padding
 if args.membrane:
     draw_membrane(width=w)
 
-plt.savefig(args.save+'.'+args.format, dpi=300)
+plt.savefig(args.save+'.'+args.format, transparent=True, pad_inches=0, bbox_inches='tight', dpi=args.dpi)
