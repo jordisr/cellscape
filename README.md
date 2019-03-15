@@ -1,15 +1,24 @@
-<img src="ceacam5.svg" alt="logo" width=700/>
-
 # Tools for proteome visualization
-## pdb2svg
-Generate a 2d space-filling outline from a PDB structure.
+## pdb2svg: Vector outlines of macromolecular structure
+<img src="ig_example.png" alt="logo" width=700/>
 
-### To run pdb2svg you will need...
-* A PDB structure of your protein of interest
+### Requirements
+To run `pdb2svg.py` you will need...
 * Python 3 (also biopython and shapely libraries)
-* PyMOL
+* [PyMOL](https://pymol.org/2/) (optional)
 
-### Overview
+If you have Python 3 installed you should be able to get the dependencies with
+```
+pip install biopython
+pip install shapely
+```
+
+### Example: 1IGT
+We can download an immunoglobulin structure from the PDB to test on (used to generate the above images):
+```
+curl -O https://files.rcsb.org/view/1IGT.pdb
+```
+#### Selecting the camera view in PyMOL
 First open the protein structure in PyMOL, choose the desired rotation (zoom is irrelevant), and enter `get_view` in the PyMOL console. The output should look something like this:
 ```
 ### cut below here and paste into script ###
@@ -22,3 +31,7 @@ set_view (\
   7324.144042969, 7506.925292969,  -20.000000000 )
 ### cut above here and paste into script ###
 ```
+Copy and paste the indicated region into a new text file, e.g. `view.txt`.
+
+#### Generating graphics
+...
