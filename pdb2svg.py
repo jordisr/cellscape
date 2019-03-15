@@ -15,9 +15,9 @@ Notes:
 '''
 
 # Some color combinations I like:
-# #FDB515' '#EE1F60' '#FDB515' '#3B7EA1'
-# #F9E37E' '#E17272' '#F9E37E' '#F9977E'
-# #276ab3' '#feb308' '#6fc276' '#ff9408'
+# '#FDB515' '#EE1F60' '#FDB515' '#3B7EA1'
+# '#F9E37E' '#E17272' '#F9E37E' '#F9977E'
+# '#276ab3' '#feb308' '#6fc276' '#ff9408'
 
 from Bio.PDB import *
 import numpy as np
@@ -47,6 +47,7 @@ parser.add_argument('--format', default='svg', help='Format to save graphics', c
 parser.add_argument('--export', action='store_true', help='Export Python object with structural information')
 parser.add_argument('--look', help='Look in directory for structure .pdb, view matrix in .txt and UniProt .xml')
 parser.add_argument('--align', action='store_true', default=False, help='Ignore PDB residue numbering and align to UniProt sequence to find offset')
+parser.add_argument('--dpi', type=int, default=300, help='DPI to use if exporting to raster formats (i.e. PNG)')
 parser.add_argument('--only_annotated', action='store_true', default=False, help='Ignore regions without UniProt annotations')
 
 # visual style options
@@ -166,8 +167,8 @@ def get_sequential_colors(n):
         sequential_colors = args.c
     else:
         cmap = cm.get_cmap(args.cmap)
-        # sequential_colors = [cmap(x) for x in range(n)]
-        sequential_colors = [cmap(x) for x in np.linspace(0.0,1.0, n)]
+        sequential_colors = [cmap(x) for x in range(n)]
+        #sequential_colors = [cmap(x) for x in np.linspace(0.0,1.0, n)]
     return sequential_colors
 
 def get_sequential_cmap(n):
@@ -415,7 +416,7 @@ if __name__ == '__main__':
                 cmap_list = get_sequential_cmap(number_groups)
                 cmap_colors = len(cmap_list)
                 color_dict = {}
-                for i, k in enumerate(residue_groups):
+                for i, k in enumerate(sorted(residue_groups)):
                     color_dict[k] = cmap_list[i % cmap_colors]
             else:
                 cmap = hex_to_cmap(args.c[0])
@@ -450,7 +451,7 @@ if __name__ == '__main__':
         elif args.outline_by in ['domain', 'topology', 'chain']:
             residue_groups = group_by(res_data, args.outline_by)
             if args.occlude:
-                region_polygons = {c:[] for c in residue_groups.keys()}
+                region_polygons = {c:[] for c in sorted(residue_groups.keys())}
                 view_object = None
                 for res in reversed(res_data):
                     coords = res.xyz
@@ -477,7 +478,7 @@ if __name__ == '__main__':
                 residue_groups = group_by(res_data, args.outline_by)
                 sequential_colors = get_sequential_colors(len(residue_groups.keys()))
                 print(len(residue_groups.keys()))
-                for group_i, (group_name, group_res) in enumerate(residue_groups.items()):
+                for group_i, (group_name, group_res) in enumerate(sorted(residue_groups.items())):
                     if not args.only_annotated or group_name is not None:
                         group_coords = np.concatenate([r.xyz for r in group_res])
                         space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in group_coords])
@@ -506,7 +507,7 @@ if __name__ == '__main__':
 
     # output coordinates and vector graphics
     out_prefix = args.save
-    plt.savefig(out_prefix+'.'+args.format, transparent=True, pad_inches=0, bbox_inches='tight', dpi=300)
+    plt.savefig(out_prefix+'.'+args.format, transparent=True, pad_inches=0, bbox_inches='tight', dpi=args.dpi)
 
     # output summary line
     image_width = np.max(atom_coords[:,0]) - np.min(atom_coords[:,0])

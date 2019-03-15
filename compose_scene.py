@@ -16,6 +16,7 @@ parser.add_argument('--padding', type=int, default=0, help='Horizontal padding t
 parser.add_argument('--axes', action='store_true', default=False, help='Draw x and y axes')
 parser.add_argument('--format', default='png', help='Format to save graphics', choices=['svg','pdf','png'])
 parser.add_argument('--membrane', action='store_true', default=False, help='Draw shaded membrane on X axis')
+parser.add_argument('--dpi', type=int, default=300, help='DPI to use if exporting to raster formats (i.e. PNG)')
 args = parser.parse_args()
 
 def draw_membrane(width, height=40):
@@ -74,4 +75,4 @@ for i, o in enumerate(object_list):
 if args.membrane:
     draw_membrane(width=w)
 
-plt.savefig(args.save+'.'+args.format, dpi=300)
+plt.savefig(args.save+'.'+args.format, transparent=True, pad_inches=0, bbox_inches='tight', dpi=args.dpi)
