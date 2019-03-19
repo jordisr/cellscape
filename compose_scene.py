@@ -7,6 +7,7 @@ import shapely.geometry as sg
 import shapely.ops as so
 import os, sys, argparse, pickle
 import glob
+import csv
 
 parser = argparse.ArgumentParser(description='Structure SVG compositing',  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--files', nargs='+', help='Pickled objects to load')
@@ -17,6 +18,11 @@ parser.add_argument('--axes', action='store_true', default=False, help='Draw x a
 parser.add_argument('--format', default='png', help='Format to save graphics', choices=['svg','pdf','png'])
 parser.add_argument('--membrane', action='store_true', default=False, help='Draw shaded membrane on X axis')
 parser.add_argument('--dpi', type=int, default=300, help='DPI to use if exporting to raster formats (i.e. PNG)')
+
+# for simulating according to stoichiometry
+parser.add_argument('--csv', help='Table of protein information')
+parser.add_argument('--num_mol', type=int, help='Total number of molecules in the scene')
+
 args = parser.parse_args()
 
 def draw_membrane(width, height=40):
@@ -24,15 +30,41 @@ def draw_membrane(width, height=40):
     membrane_box = mpatches.FancyBboxPatch(
         [-100, 0], 2*width, -1*height,
         boxstyle=mpatches.BoxStyle("Round", pad=0.02),
-        facecolor='#DDD5C7', alpha=1, zorder=2)
+        facecolor='#DDD5C7', ec='#DDD5C7', alpha=1, zorder=2)
     axs.add_patch(membrane_box)
 
-# read in saved Python objects
+# list of protein polygons to draw
 object_list = []
-for path in args.files:
-    with open(path,'rb') as f:
-        data = pickle.load(f)
-        object_list.append(data)
+
+if args.files:
+    for path in args.files:
+        with open(path,'rb') as f:
+            data = pickle.load(f)
+            object_list.append(data)
+            
+elif args.csv:
+    protein_data = dict()
+    with open(args.csv) as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            (name, stoich, path) = (row['name'], int(row['stoichiometry']), row['file'])
+            with open(path,'rb') as f:
+                data = pickle.load(f)
+                protein_data[name] = (stoich, data)
+    sum_stoich = np.sum([p[0] for p in protein_data.values()])
+    if args.num_mol:
+        num_mol = args.num_mol
+    else:
+        num_mol = len(protein_data)
+    num_copies = 1 + (num_mol // sum_stoich)
+    for k,v in protein_data.items():
+        for i in range(v[0]*num_copies):
+            object_list.append(v[1])
+    np.random.shuffle(object_list)
+    object_list = object_list[:num_mol]
+
+else:
+    sys.exit("No input files specified, see options with --help")
 
 if len(args.offsets) > 0:
     assert(len(args.files) == len(args.offsets))
