@@ -238,6 +238,14 @@ def group_by(obj, attr):
             d[a] = [o]
     return d
 
+def not_none(x):
+    if x is None:
+        return ""
+    elif len(x) > 0 and x[0] is None:
+        return ""
+    else:
+        return x
+
 if __name__ == '__main__':
 
     # look in given directory for relevant files
@@ -416,7 +424,7 @@ if __name__ == '__main__':
                 cmap_list = get_sequential_cmap(number_groups)
                 cmap_colors = len(cmap_list)
                 color_dict = {}
-                for i, k in enumerate(sorted(residue_groups)):
+                for i, k in enumerate(sorted(residue_groups.keys(), key=not_none)):
                     color_dict[k] = cmap_list[i % cmap_colors]
             else:
                 cmap = hex_to_cmap(args.c[0])
@@ -440,18 +448,19 @@ if __name__ == '__main__':
                             view_object = view_object.union(space_filling)
 
             for res in res_data:
-                if res.visible:
-                    coords = res.xyz
-                    if args.color_by != 'same':
-                        cmap = color_dict[getattr(res, args.color_by)]
-                    res_color = cmap(rescale_coord(np.mean(coords[:,2])))
-                    space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in coords])
-                    plot_polygon(space_filling, fc=res_color)
+                if not args.only_annotated or getattr(res, args.color_by) is not None:
+                    if res.visible:
+                        coords = res.xyz
+                        if args.color_by != 'same':
+                            cmap = color_dict[getattr(res, args.color_by)]
+                        res_color = cmap(rescale_coord(np.mean(coords[:,2])))
+                        space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in coords])
+                        plot_polygon(space_filling, fc=res_color)
 
         elif args.outline_by in ['domain', 'topology', 'chain']:
             residue_groups = group_by(res_data, args.outline_by)
             if args.occlude:
-                region_polygons = {c:[] for c in sorted(residue_groups.keys())}
+                region_polygons = {c:[] for c in sorted(residue_groups.keys(), key=not_none)}
                 view_object = None
                 for res in reversed(res_data):
                     coords = res.xyz
@@ -477,8 +486,7 @@ if __name__ == '__main__':
             else:
                 residue_groups = group_by(res_data, args.outline_by)
                 sequential_colors = get_sequential_colors(len(residue_groups.keys()))
-                print(len(residue_groups.keys()))
-                for group_i, (group_name, group_res) in enumerate(sorted(residue_groups.items())):
+                for group_i, (group_name, group_res) in enumerate(sorted(residue_groups.items(), key=not_none)):
                     if not args.only_annotated or group_name is not None:
                         group_coords = np.concatenate([r.xyz for r in group_res])
                         space_filling = so.cascaded_union([sg.Point(i).buffer(args.radius) for i in group_coords])
