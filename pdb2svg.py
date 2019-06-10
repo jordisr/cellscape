@@ -241,13 +241,14 @@ def group_by(obj, attr):
 def not_none(x):
     if x is None:
         return ""
-    elif isinstance(x, list) and x[0] is None:
-        return ""
     else:
-        if isinstance(x, list):
-            return str(x[1])
-        else:
+        if isinstance(x, str):
             return x
+        else:
+            if x[0] is None:
+                return ""
+            else:
+                return str(x[1])
 
 if __name__ == '__main__':
 
