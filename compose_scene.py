@@ -23,15 +23,15 @@ parser.add_argument('--dpi', type=int, default=300, help='DPI to use if exportin
 # for simulating according to stoichiometry
 parser.add_argument('--csv', help='Table of protein information')
 parser.add_argument('--num_mol', type=int, help='Total number of molecules in the scene')
-parser.add_argument('--shuffle', default=False, action='store_true', help='Shuffle order of proteins')
-parser.add_argument('--background', type=int, default=0, help='Add background plane using same frequencies')
+parser.add_argument('--order_by', default='input', choices=['input', 'random', 'height'], help='How to order proteins in scene')
+parser.add_argument('--background', action='store_true', default=False, help='Add background plane using same frequencies')
 
 args = parser.parse_args()
 
 def draw_membrane(width, height=40):
     axs = plt.gca()
     membrane_box = mpatches.FancyBboxPatch(
-        [-100, 0], 2*width, -1*height,
+        [-100, 0], 1.5*width, -1*height,
         boxstyle=mpatches.BoxStyle("Round", pad=0.02),
         facecolor='#DDD5C7', ec='#DDD5C7', alpha=1, zorder=2)
     axs.add_patch(membrane_box)
@@ -49,18 +49,18 @@ def draw_membrane_fancy(width, height=40, jitter=False):
 
     # membrane box background
     membrane_box = mpatches.FancyBboxPatch(
-        [-100, -1*head_radius], 2*width, -1*height+head_radius,
+        [-100, -1*head_radius+10], 1.5*width, -1*height+head_radius,
         boxstyle=mpatches.BoxStyle("Round", pad=0.02),
         facecolor=membrane_box_fc, alpha=1, zorder=1)
     axs.add_patch(membrane_box)
 
     # draw each lipid pair
     for i in range(num_lipids):
-        top_jitter_y = 0
-        bot_jitter_y = 0
+        top_jitter_y = 10
+        bot_jitter_y = 10
         if jitter:
-            top_jitter_y = (np.random.random()-0.5)*2*head_radius
-            bot_jitter_y = (np.random.random()-0.5)*2*head_radius
+            top_jitter_y += (np.random.random()-0.5)*2*head_radius
+            bot_jitter_y += (np.random.random()-0.5)*2*head_radius
         axs.add_line(mlines.Line2D([i*head_radius*2-100, i*head_radius*2-100], [-4+top_jitter_y, -18+top_jitter_y], zorder=1.5, c=lipid_tail_fc, linewidth=head_radius*.7, alpha=1, solid_capstyle='round'))
         axs.add_line(mlines.Line2D([i*head_radius*2-100, i*head_radius*2-100], [-38+bot_jitter_y, -24+bot_jitter_y], zorder=1.5, c=lipid_tail_fc, linewidth=head_radius*.7, alpha=1, solid_capstyle='round'))
         axs.add_patch(mpatches.Circle((i*head_radius*2-100, -1*head_radius+top_jitter_y), head_radius, facecolor=lipid_head_fc, ec='k', linewidth=0.3, alpha=1, zorder=2))
@@ -68,13 +68,14 @@ def draw_membrane_fancy(width, height=40, jitter=False):
 
 # list of protein polygons to draw
 object_list = []
+num_files = 0
 
 if args.files:
     for path in args.files:
         with open(path,'rb') as f:
             data = pickle.load(f)
             object_list.append(data)
-
+    num_files = len(args.files)
 elif args.csv:
     protein_data = dict()
     with open(args.csv) as csvfile:
@@ -84,38 +85,7 @@ elif args.csv:
             with open(path,'rb') as f:
                 data = pickle.load(f)
                 protein_data[name] = (stoich, data)
-
-    # total sum of protein counts
-    sum_stoich = np.sum([p[0] for p in protein_data.values()])
-
-    if args.num_mol:
-        num_mol = args.num_mol
-    else:
-        num_mol = len(protein_data)
-
-    #
-    #if sum_stoich > num_mol or sum_stoich < 2:
-    #    pass
-        # sample num_mol according to stoichiometries/sum(stoichiometries)
-    #else:
-    #    num_mol = sum_stoich
-
-    # protein copy number
-    num_copies = 1 + (num_mol // sum_stoich)
-    for k,v in protein_data.items():
-        for i in range(v[0]*num_copies):
-            object_list.append(v[1])
-
-    # shuffle order of proteins
-    if args.shuffle:
-        np.random.shuffle(object_list)
-
-    object_list = object_list[:num_mol]
-
-    # assemble images for background
-    if args.background:
-        pass
-
+    num_files = len(protein_data)
 else:
     sys.exit("No input files specified, see options with --help")
 
@@ -124,6 +94,34 @@ if len(args.offsets) > 0:
     y_offsets = list(map(float, args.offsets))
 else:
     y_offsets = np.zeros(len(object_list))
+
+if args.num_mol is None:
+    num_mol = num_files
+else:
+    num_mol = args.num_mol
+
+if args.csv:
+    # total sum of protein counts
+    protein_names = np.array(sorted(protein_data.keys()))
+    protein_stoich = np.array([protein_data[p][0] for p in protein_names])
+    sum_stoich = np.sum(protein_stoich)
+    stoich_weights = protein_stoich / sum_stoich
+
+    # protein copy number
+    sampled_protein = np.random.choice(protein_names, size=num_mol, p=stoich_weights)
+    object_list = [protein_data[p][1] for p in sampled_protein]
+
+    # assemble objects for background
+    if args.background:
+        scaling_factor = 0.6
+        sampled_protein = np.random.choice(protein_names, int(num_mol*1/scaling_factor), p=stoich_weights)
+        background_object_list = [protein_data[p][1] for p in sampled_protein]
+
+# sort proteins
+if args.order_by == "random":
+    np.random.shuffle(object_list)
+elif args.order_by == "height":
+    object_list = sorted(object_list, key=lambda x: x['height'], reverse=True)
 
 # set font options
 font_options = {'family':'Arial', 'weight':'normal', 'size':10}
@@ -158,21 +156,19 @@ for i, o in enumerate(object_list):
         axs.fill(xy[:,0]+w, xy[:,1], fc=p.get_facecolor(), ec='k', linewidth=lw, zorder=3)
     w += o['width']+args.padding
 
+if args.background:
+    background_w=0
+    for i, o in enumerate(background_object_list):
+        for p in o['polygons']:
+            xy = p.get_xy()
+            axs.fill((xy[:,0]+background_w)*scaling_factor, (xy[:,1])*scaling_factor, fc=p.get_facecolor(), linewidth=0, zorder=1)
+        background_w += (o['width']+args.padding)
+
 if args.membrane is not None:
+    plt.gca().set_ylim((-45,350))
     if args.membrane == 'box':
         draw_membrane(width=w)
     elif args.membrane == 'fancy':
         draw_membrane_fancy(width=w)
-
-if args.background:
-    scaling_factor = 0.7
-    pass
-    # background plane
-    #w=0
-    #for i, o in enumerate(object_list):
-    #    for p in o['polygons']:
-    #        xy = p.get_xy()
-    #        axs.fill((xy[:,0]+w)*scaling_factor, (xy[:,1])*scaling_factor, fc=p.get_facecolor(), linewidth=0, zorder=1)
-    #    w += o['width']+args.padding
 
 plt.savefig(args.save+'.'+args.format, transparent=True, pad_inches=0, bbox_inches='tight', dpi=args.dpi)
