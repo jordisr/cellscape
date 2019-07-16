@@ -31,6 +31,9 @@ parser.add_argument('--testing', action='store_true', default=False, help='Exper
 
 args = parser.parse_args()
 
+def rotation_matrix_2d(theta):
+    return np.array([[np.cos(theta), -1*np.sin(theta)],[np.sin(theta), np.cos(theta)]])
+
 def draw_membrane(width, height=40):
     axs = plt.gca()
     membrane_box = mpatches.FancyBboxPatch(
