@@ -126,9 +126,16 @@ def read_pymol_view(file):
 
 # define custom Lighter Color => Color => Darker Color cmap
 def hex_to_cmap(h, w=0.3, name='test'):
-    r = int(h[1:3], 16)
-    g = int(h[3:5], 16)
-    b = int(h[5:7], 16)
+    if h[0] == "#":
+        r = int(h[1:3], 16)
+        g = int(h[3:5], 16)
+        b = int(h[5:7], 16)
+    elif len(h) == 6:
+        r = int(h[0:2], 16)
+        g = int(h[2:4], 16)
+        b = int(h[4:6], 16)
+    else:
+        sys.exit("Not valid hexadecimal color.")
     h, l, s = colorsys.rgb_to_hls(r/255,g/255,b/255)
     # lighter and darker versions of color in HLS space
     c3 = (h, min(l+(1-w)*l, 1), s)
