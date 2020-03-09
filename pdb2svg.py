@@ -167,6 +167,9 @@ def plot_polygon(poly, fc):
         for p in poly:
             xs, ys = p.exterior.xy
             axs.fill(xs, ys, alpha=1, fc=fc, ec=args.ec, linewidth=args.linewidth, zorder=3)
+    elif isinstance(poly, (tuple, list)):
+        xs, ys = poly
+        axs.fill(xs, ys, alpha=1, fc=fc, ec=args.ec, linewidth=args.linewidth, zorder=3)
     return 0
 
 def get_sequential_colors(n):
@@ -280,8 +283,11 @@ if __name__ == '__main__':
         sys.exit("Error: No domain information. Need to specify topology with UniProt XML file (--uniprot)")
 
     # open PDB structure
+    if args.pdb:
+        pdb_name = os.path.basename(args.pdb)
+    else:
+        sys.exit("Provide a PDB file using --pdb or --look")
     parser = PDBParser()
-    pdb_name = os.path.basename(args.pdb)
     structure = parser.get_structure(pdb_name, args.pdb)
     model = structure[args.model]
 
@@ -531,10 +537,14 @@ if __name__ == '__main__':
     # output summary line
     image_width = np.max(atom_coords[:,0]) - np.min(atom_coords[:,0])
     image_height = np.max(atom_coords[:,1]) - np.min(atom_coords[:,1])
-    print('\t'.join(map(str, [args.pdb, args.save+'.'+args.format, image_height, image_width])))
+    start_coord = np.mean(atom_coords[:50])
+    end_coord = np.mean(atom_coords[:-50])
+    bottom_coord = min(atom_coords, key=operator.itemgetter(1))
+    top_coord = max(atom_coords, key=operator.itemgetter(1))
+    print('\t'.join(map(str, [args.pdb, args.save+'.'+args.format, image_height, image_width, bottom_coord, top_coord])))
 
     if args.export:
-        data = {'polygons':[], 'width':image_width, 'height':image_height}
+        data = {'polygons':[], 'width':image_width, 'height':image_height, 'start':start_coord, 'end':end_coord, 'bottom':bottom_coord, 'top':top_coord}
         import matplotlib
         for o in plt.gca().findobj(matplotlib.patches.Polygon):
             data['polygons'].append(o)
