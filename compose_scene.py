@@ -17,7 +17,8 @@ parser.add_argument('--offsets', nargs='+', default=[], help='Vertical offsets f
 parser.add_argument('--padding', type=int, default=0, help='Horizontal padding to add between each molecule (in angstroms)')
 parser.add_argument('--axes', action='store_true', default=False, help='Draw x and y axes')
 parser.add_argument('--format', default='png', help='Format to save graphics', choices=['svg','pdf','png'])
-parser.add_argument('--membrane', default=None, choices=[None, 'box', 'fancy', 'extra_fancy'], help='Draw membrane on X axis')
+parser.add_argument('--membrane', default=None, choices=[None, 'flat', 'wave'], help='Draw membrane on X axis')
+parser.add_argument('--membrane_lipids', action='store_true', help='Draw lipid head groups')
 parser.add_argument('--dpi', type=int, default=300, help='DPI to use if exporting to raster formats (i.e. PNG)')
 
 # for simulating according to stoichiometry
@@ -41,6 +42,35 @@ def draw_membrane(width, height=40):
         boxstyle=mpatches.BoxStyle("Round", pad=0.02),
         facecolor='#DDD5C7', ec='#DDD5C7', alpha=1, zorder=2)
     axs.add_patch(membrane_box)
+
+class membrane_cartoon:
+    def __init__(self, width, thickness):
+        self.width = width
+        self.thickness = thickness
+
+    def flat(self):
+        self.height_at = lambda x: self.thickness/2
+
+    def sinusoidal(self, frequency=1, amplitude=1):
+        self.height_at = lambda x: self.thickness/2*amplitude*np.sin(x*frequency*2*np.pi/self.width)
+
+    def draw(self, lipids=False):
+        membrane_box_fc='#C4E7EF'
+        membrane_x = np.linspace(0,self.width,100)
+        membrane_y = np.array([self.height_at(x) for x in membrane_x])
+        plt.fill_between(membrane_x, membrane_y, membrane_y-self.thickness, color=membrane_box_fc)
+        if lipids:
+            # color scheme
+            lipid_head_fc='#D6D1EF'
+            lipid_tail_fc='#A3DCEF'
+            head_radius = 4
+            num_lipids = int(self.width/(2*head_radius))
+            for i in range(num_lipids):
+                membrane_y = self.height_at(i/num_lipids*self.width)
+                axs.add_line(mlines.Line2D([i*head_radius*2, i*head_radius*2], [-4+membrane_y, -18+membrane_y], zorder=1.5, c=lipid_tail_fc, linewidth=head_radius*.7, alpha=1, solid_capstyle='round'))
+                axs.add_line(mlines.Line2D([i*head_radius*2, i*head_radius*2], [-38+membrane_y, -24+membrane_y], zorder=1.5, c=lipid_tail_fc, linewidth=head_radius*.7, alpha=1, solid_capstyle='round'))
+                axs.add_patch(mpatches.Circle((i*head_radius*2, -1*head_radius+membrane_y), head_radius, facecolor=lipid_head_fc, ec='k', linewidth=0.3, alpha=1, zorder=2))
+                axs.add_patch(mpatches.Circle((i*head_radius*2, -1*self.thickness+membrane_y), head_radius, facecolor=lipid_head_fc, ec='k', linewidth=0.3, alpha=1, zorder=2))
 
 # cartoon of lipid bilayer
 def draw_membrane_fancy(width, height=40, jitter=False):
@@ -166,6 +196,15 @@ if args.testing:
     for i,c in enumerate(protein_names):
         color_scheme[c] = cmap(i/len(protein_names))
 
+if args.membrane is not None:
+    total_width = np.sum([o['width'] for o in object_list])+len(object_list)*args.padding
+    membrane = membrane_cartoon(width=total_width, thickness=40)
+    if args.membrane == "flat":
+        membrane.flat()
+    elif args.membrane == "wave":
+        membrane.sinusoidal(frequency=2, amplitude=2)
+    membrane.draw(lipids=args.membrane_lipids)
+
 # draw molecules
 w=0
 for i, o in enumerate(object_list):
@@ -176,10 +215,11 @@ for i, o in enumerate(object_list):
         lw=0.5
     for p in o['polygons']:
         xy = p.get_xy()
+        y_offset = membrane.height_at(w+o['bottom'][0])-10
         if args.testing:
-            axs.fill(xy[:,0]+w, xy[:,1], fc=color_scheme[o['name']], ec='k', linewidth=lw, zorder=3)
+            axs.fill(xy[:,0]+w, xy[:,1]+y_offset, fc=color_scheme[o['name']], ec='k', linewidth=lw, zorder=3)
         else:
-            axs.fill(xy[:,0]+w, xy[:,1], fc=p.get_facecolor(), ec='k', linewidth=lw, zorder=3)
+            axs.fill(xy[:,0]+w, xy[:,1]+y_offset, fc=p.get_facecolor(), ec='k', linewidth=lw, zorder=3)
 
     w += o['width']+args.padding
 
@@ -193,14 +233,5 @@ if args.background:
             else:
                 axs.fill((xy[:,0]+background_w)*scaling_factor, (xy[:,1])*scaling_factor, fc=p.get_facecolor(), ec='k', alpha=0.8, linewidth=lw*scaling_factor, zorder=1)
         background_w += (o['width']+args.padding)
-
-if args.membrane is not None:
-    plt.gca().set_ylim((-45,350))
-    if args.membrane == 'box':
-        draw_membrane(width=w)
-    elif args.membrane == 'fancy':
-        draw_membrane_fancy(width=w)
-    elif args.membrane == 'extra_fancy':
-        draw_membrane_fancy(width=w, jitter=True)
 
 plt.savefig(args.save+'.'+args.format, transparent=True, pad_inches=0, bbox_inches='tight', dpi=args.dpi)
