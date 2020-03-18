@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.lines as mlines
 from matplotlib import lines, text, cm
+from matplotlib.colors import LinearSegmentedColormap, ListedColormap
+from scipy import interpolate
 import shapely.geometry as sg
 import shapely.ops as so
 import os, sys, argparse, pickle
@@ -17,18 +19,19 @@ parser.add_argument('--offsets', nargs='+', default=[], help='Vertical offsets f
 parser.add_argument('--padding', type=int, default=0, help='Horizontal padding to add between each molecule (in angstroms)')
 parser.add_argument('--axes', action='store_true', default=False, help='Draw x and y axes')
 parser.add_argument('--format', default='png', help='Format to save graphics', choices=['svg','pdf','png'])
-parser.add_argument('--membrane', default=None, choices=[None, 'flat', 'wave'], help='Draw membrane on X axis')
+parser.add_argument('--membrane', default=None, choices=[None, 'arc', 'flat', 'wave'], help='Draw membrane on X axis')
 parser.add_argument('--membrane_lipids', action='store_true', help='Draw lipid head groups')
 parser.add_argument('--dpi', type=int, default=300, help='DPI to use if exporting to raster formats (i.e. PNG)')
+parser.add_argument('--order_by', default='input', choices=['input', 'random', 'height'], help='How to order proteins in scene')
+parser.add_argument('--recolor', action='store_true', default=False, help='Recolor proteins in scene')
+parser.add_argument('--recolor_cmap', default=['hsv'], nargs='+', help='Named cmap or color scheme for re-coloring')
+parser.add_argument('--membrane_interface', action='store_true', default=False, help='Option under development')
 
 # for simulating according to stoichiometry
 parser.add_argument('--csv', help='Table of protein information')
 parser.add_argument('--sample_from', help='Column to use for sampling', default='stoichiometry')
 parser.add_argument('--num_mol', type=int, help='Total number of molecules in the scene')
-parser.add_argument('--order_by', default='input', choices=['input', 'random', 'height'], help='How to order proteins in scene')
 parser.add_argument('--background', action='store_true', default=False, help='Add background plane using same frequencies')
-parser.add_argument('--testing', action='store_true', default=False, help='Experimental option')
-
 
 args = parser.parse_args()
 
@@ -44,33 +47,41 @@ def draw_membrane(width, height=40):
     axs.add_patch(membrane_box)
 
 class membrane_cartoon:
-    def __init__(self, width, thickness):
+    def __init__(self, width, thickness, base_y=0):
         self.width = width
         self.thickness = thickness
+        self.y = base_y
+        # other constants
+        self.head_radius = 4
 
     def flat(self):
-        self.height_at = lambda x: self.thickness/2
+        self.height_at = lambda x: self.y + self.thickness/2
 
     def sinusoidal(self, frequency=1, amplitude=1):
-        self.height_at = lambda x: self.thickness/2*amplitude*np.sin(x*frequency*2*np.pi/self.width)
+        self.height_at = lambda x: self.y + self.thickness/2*amplitude*np.sin(x*frequency*2*np.pi/self.width)
+
+    def interpolate(self, x, y, kind='linear'):
+        #self.height_at = interpolate.interp1d(x, y, kind=kind)
+        self.height_fn = interpolate.PchipInterpolator(x, y)
+        self.height_at = lambda x: self.height_fn(x) + self.y
 
     def draw(self, lipids=False):
         membrane_box_fc='#C4E7EF'
-        membrane_x = np.linspace(0,self.width,100)
-        membrane_y = np.array([self.height_at(x) for x in membrane_x])
-        plt.fill_between(membrane_x, membrane_y, membrane_y-self.thickness, color=membrane_box_fc)
+        membrane_x = np.linspace(0,self.width,200)
+        membrane_y_top = np.array([self.height_at(x) for x in membrane_x])
+        membrane_y_bot = membrane_y_top-self.thickness
+        plt.fill_between(membrane_x, membrane_y_top, membrane_y_bot, color=membrane_box_fc)
         if lipids:
             # color scheme
             lipid_head_fc='#D6D1EF'
             lipid_tail_fc='#A3DCEF'
-            head_radius = 4
-            num_lipids = int(self.width/(2*head_radius))
+            num_lipids = int(self.width/(2*self.head_radius))
             for i in range(num_lipids):
                 membrane_y = self.height_at(i/num_lipids*self.width)
-                axs.add_line(mlines.Line2D([i*head_radius*2, i*head_radius*2], [-4+membrane_y, -18+membrane_y], zorder=1.5, c=lipid_tail_fc, linewidth=head_radius*.7, alpha=1, solid_capstyle='round'))
-                axs.add_line(mlines.Line2D([i*head_radius*2, i*head_radius*2], [-38+membrane_y, -24+membrane_y], zorder=1.5, c=lipid_tail_fc, linewidth=head_radius*.7, alpha=1, solid_capstyle='round'))
-                axs.add_patch(mpatches.Circle((i*head_radius*2, -1*head_radius+membrane_y), head_radius, facecolor=lipid_head_fc, ec='k', linewidth=0.3, alpha=1, zorder=2))
-                axs.add_patch(mpatches.Circle((i*head_radius*2, -1*self.thickness+membrane_y), head_radius, facecolor=lipid_head_fc, ec='k', linewidth=0.3, alpha=1, zorder=2))
+                axs.add_line(mlines.Line2D([i*self.head_radius*2, i*self.head_radius*2], [-4+membrane_y, -18+membrane_y], zorder=1.5, c=lipid_tail_fc, linewidth=self.head_radius*.7, alpha=1, solid_capstyle='round'))
+                axs.add_line(mlines.Line2D([i*self.head_radius*2, i*self.head_radius*2], [-38+membrane_y, -24+membrane_y], zorder=1.5, c=lipid_tail_fc, linewidth=self.head_radius*.7, alpha=1, solid_capstyle='round'))
+                axs.add_patch(mpatches.Circle((i*self.head_radius*2, -1*self.head_radius+membrane_y), self.head_radius, facecolor=lipid_head_fc, ec='k', linewidth=0.3, alpha=1, zorder=2))
+                axs.add_patch(mpatches.Circle((i*self.head_radius*2, -1*self.thickness+membrane_y), self.head_radius, facecolor=lipid_head_fc, ec='k', linewidth=0.3, alpha=1, zorder=2))
 
 # cartoon of lipid bilayer
 def draw_membrane_fancy(width, height=40, jitter=False):
@@ -160,6 +171,8 @@ if args.csv:
         scaling_factor = 0.7
         sampled_protein = np.random.choice(protein_names, int(num_mol*1/scaling_factor), p=stoich_weights)
         background_object_list = [protein_data[p][1] for p in sampled_protein]
+else:
+    protein_names = [o['name'] for o in object_list]
 
 # sort proteins
 if args.order_by == "random":
@@ -187,20 +200,43 @@ else:
     plt.gca().xaxis.set_major_locator(plt.NullLocator())
     plt.gca().yaxis.set_major_locator(plt.NullLocator())
 
-if args.testing:
-    # colors
-    cmap = cm.get_cmap('hsv')
-    #cmap1 = cm.get_cmap('Set1')
-    #cmap2 = cm.get_cmap('Pastel1')
+if args.recolor:
+    # default cmap is hsv. for discrete could try Set1 or Pastel1
+    if len(args.recolor_cmap) == 1:
+        cmap = cm.get_cmap(args.recolor_cmap[0])
+    else:
+        cmap = ListedColormap(args.recolor_cmap)
     color_scheme = dict()
     for i,c in enumerate(protein_names):
-        color_scheme[c] = cmap(i/len(protein_names))
+        if isinstance(cmap, ListedColormap):
+            color_scheme[c] = cmap(i)
+        else:
+            color_scheme[c] = cmap(i/len(protein_names))
 
 if args.membrane is not None:
     total_width = np.sum([o['width'] for o in object_list])+len(object_list)*args.padding
     membrane = membrane_cartoon(width=total_width, thickness=40)
+
+    # <-------------------------------------------------------------------------
+    # testing new code
+    if args.membrane_interface:
+        skyline_pos = []
+        w=0
+        for i, o in enumerate(object_list):
+            skyline_pos.append([w,o['height']+np.random.rand()*10])
+            skyline_pos.append([w+o['width'],o['height']+np.random.rand()*10])
+            w += o['width'] + args.padding
+        skyline_pos = np.array(skyline_pos).T
+        membrane2 = membrane_cartoon(width=total_width, thickness=40, base_y=50)
+        #membrane2.interpolate(np.array([0,20,50,100,150,300,350,total_width]),np.array([300,300,200,170,150,150,75,75]))
+        membrane2.interpolate(skyline_pos[0], skyline_pos[1])
+        membrane2.draw(lipids=True)
+    # <-------------------------------------------------------------------------
+
     if args.membrane == "flat":
         membrane.flat()
+    elif args.membrane == "arc":
+        membrane.sinusoidal(frequency=0.5, amplitude=2)
     elif args.membrane == "wave":
         membrane.sinusoidal(frequency=2, amplitude=2)
     membrane.draw(lipids=args.membrane_lipids)
@@ -216,7 +252,7 @@ for i, o in enumerate(object_list):
     for p in o['polygons']:
         xy = p.get_xy()
         y_offset = membrane.height_at(w+o['bottom'][0])-10
-        if args.testing:
+        if args.recolor:
             axs.fill(xy[:,0]+w, xy[:,1]+y_offset, fc=color_scheme[o['name']], ec='k', linewidth=lw, zorder=3)
         else:
             axs.fill(xy[:,0]+w, xy[:,1]+y_offset, fc=p.get_facecolor(), ec='k', linewidth=lw, zorder=3)
@@ -228,7 +264,7 @@ if args.background:
     for i, o in enumerate(background_object_list):
         for p in o['polygons']:
             xy = p.get_xy()
-            if args.testing:
+            if args.recolor:
                 axs.fill((xy[:,0]+background_w)*scaling_factor, (xy[:,1])*scaling_factor, fc=color_scheme[o['name']], ec='k', alpha=0.8, linewidth=lw*scaling_factor, zorder=1)
             else:
                 axs.fill((xy[:,0]+background_w)*scaling_factor, (xy[:,1])*scaling_factor, fc=p.get_facecolor(), ec='k', alpha=0.8, linewidth=lw*scaling_factor, zorder=1)
