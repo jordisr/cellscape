@@ -25,7 +25,7 @@ parser.add_argument('--dpi', type=int, default=300, help='DPI to use if exportin
 parser.add_argument('--order_by', default='input', choices=['input', 'random', 'height'], help='How to order proteins in scene')
 parser.add_argument('--recolor', action='store_true', default=False, help='Recolor proteins in scene')
 parser.add_argument('--recolor_cmap', default=['hsv'], nargs='+', help='Named cmap or color scheme for re-coloring')
-parser.add_argument('--membrane_interface', action='store_true', default=False, help='Option under development')
+parser.add_argument('--membrane_interface', action='store_true', default=False, help=argparse.SUPPRESS) # option under development
 
 # for simulating according to stoichiometry
 parser.add_argument('--csv', help='Table of protein information')
@@ -45,6 +45,37 @@ def draw_membrane(width, height=40):
         boxstyle=mpatches.BoxStyle("Round", pad=0.02),
         facecolor='#DDD5C7', ec='#DDD5C7', alpha=1, zorder=2)
     axs.add_patch(membrane_box)
+
+def draw_object(o, offset=[0,0], flip=False, background=False, scaling=1, zorder=3, recenter=None):
+    # abstracting some of the drawing details, might want to move to a class
+
+    # use thinner line with many objects (e.g. with --residues)
+    if len(o['polygons']) > 50:
+        lw=0.1
+    else:
+        lw=0.5
+
+    for p in o['polygons']:
+
+        # get polygon coordinates and transform if necessary
+        xy = p.get_xy()
+        if recenter is not None:
+            # optionally shift coordinates before rotation
+            xy -= recenter
+        if flip:
+            xy = np.dot(xy, np.array([[-1,0],[0,-1]]))
+
+        # either use existing color or recolor with global color scheme
+        if args.recolor:
+            fc = color_scheme[o['name']]
+        else:
+            fc = p.get_facecolor()
+
+        # fill polygon, preset for semi-transparent background layer
+        if not background:
+            axs.fill((xy[:,0]+offset[0])*scaling, (xy[:,1]+offset[1])*scaling, fc=fc, ec='k', linewidth=lw*scaling, zorder=zorder)
+        else:
+            axs.fill((xy[:,0]+offset[0])*scaling, (xy[:,1]+offset[1])*scaling, fc=fc, ec='k', alpha=0.8, linewidth=lw*scaling, zorder=1)
 
 class membrane_cartoon:
     def __init__(self, width, thickness, base_y=0):
@@ -70,7 +101,7 @@ class membrane_cartoon:
         membrane_x = np.linspace(0,self.width,200)
         membrane_y_top = np.array([self.height_at(x) for x in membrane_x])
         membrane_y_bot = membrane_y_top-self.thickness
-        plt.fill_between(membrane_x, membrane_y_top, membrane_y_bot, color=membrane_box_fc)
+        plt.fill_between(membrane_x, membrane_y_top-self.head_radius, membrane_y_bot+self.head_radius, color=membrane_box_fc, zorder=1.6)
         if lipids:
             # color scheme
             lipid_head_fc='#D6D1EF'
@@ -78,8 +109,8 @@ class membrane_cartoon:
             num_lipids = int(self.width/(2*self.head_radius))
             for i in range(num_lipids):
                 membrane_y = self.height_at(i/num_lipids*self.width)
-                axs.add_line(mlines.Line2D([i*self.head_radius*2, i*self.head_radius*2], [-4+membrane_y, -18+membrane_y], zorder=1.5, c=lipid_tail_fc, linewidth=self.head_radius*.7, alpha=1, solid_capstyle='round'))
-                axs.add_line(mlines.Line2D([i*self.head_radius*2, i*self.head_radius*2], [-38+membrane_y, -24+membrane_y], zorder=1.5, c=lipid_tail_fc, linewidth=self.head_radius*.7, alpha=1, solid_capstyle='round'))
+                axs.add_line(mlines.Line2D([i*self.head_radius*2, i*self.head_radius*2], [-4+membrane_y, -18+membrane_y], zorder=1.7, c=lipid_tail_fc, linewidth=self.head_radius*.7, alpha=1, solid_capstyle='round'))
+                axs.add_line(mlines.Line2D([i*self.head_radius*2, i*self.head_radius*2], [-38+membrane_y, -24+membrane_y], zorder=1.7, c=lipid_tail_fc, linewidth=self.head_radius*.7, alpha=1, solid_capstyle='round'))
                 axs.add_patch(mpatches.Circle((i*self.head_radius*2, -1*self.head_radius+membrane_y), self.head_radius, facecolor=lipid_head_fc, ec='k', linewidth=0.3, alpha=1, zorder=2))
                 axs.add_patch(mpatches.Circle((i*self.head_radius*2, -1*self.thickness+membrane_y), self.head_radius, facecolor=lipid_head_fc, ec='k', linewidth=0.3, alpha=1, zorder=2))
 
@@ -228,7 +259,6 @@ if args.membrane is not None:
             w += o['width'] + args.padding
         skyline_pos = np.array(skyline_pos).T
         membrane2 = membrane_cartoon(width=total_width, thickness=40, base_y=50)
-        #membrane2.interpolate(np.array([0,20,50,100,150,300,350,total_width]),np.array([300,300,200,170,150,150,75,75]))
         membrane2.interpolate(skyline_pos[0], skyline_pos[1])
         membrane2.draw(lipids=True)
     # <-------------------------------------------------------------------------
@@ -243,31 +273,22 @@ if args.membrane is not None:
 
 # draw molecules
 w=0
-for i, o in enumerate(object_list):
-    # infer if --residues and use lighter line width
-    if len(o['polygons']) > 50:
-        lw=0.1
-    else:
-        lw=0.5
-    for p in o['polygons']:
-        xy = p.get_xy()
+if args.membrane_interface:
+    for i, o in enumerate(object_list):
         y_offset = membrane.height_at(w+o['bottom'][0])-10
-        if args.recolor:
-            axs.fill(xy[:,0]+w, xy[:,1]+y_offset, fc=color_scheme[o['name']], ec='k', linewidth=lw, zorder=3)
-        else:
-            axs.fill(xy[:,0]+w, xy[:,1]+y_offset, fc=p.get_facecolor(), ec='k', linewidth=lw, zorder=3)
+        draw_object(o, offset=[w, y_offset])
+        draw_object(o, offset=[w+o['width'], 2*o['height']+5], flip=True) # testing out rotations
+        w += o['width']+args.padding
+else:
+    for i, o in enumerate(object_list):
+        y_offset = membrane.height_at(w+o['bottom'][0])-10
+        draw_object(o, offset=[w, y_offset])
+        w += o['width']+args.padding
 
-    w += o['width']+args.padding
-
-if args.background:
-    background_w=0
-    for i, o in enumerate(background_object_list):
-        for p in o['polygons']:
-            xy = p.get_xy()
-            if args.recolor:
-                axs.fill((xy[:,0]+background_w)*scaling_factor, (xy[:,1])*scaling_factor, fc=color_scheme[o['name']], ec='k', alpha=0.8, linewidth=lw*scaling_factor, zorder=1)
-            else:
-                axs.fill((xy[:,0]+background_w)*scaling_factor, (xy[:,1])*scaling_factor, fc=p.get_facecolor(), ec='k', alpha=0.8, linewidth=lw*scaling_factor, zorder=1)
-        background_w += (o['width']+args.padding)
+    if args.background:
+        background_w=0
+        for i, o in enumerate(background_object_list):
+            draw_object(o, offset=[background_w, 0], scaling=scaling_factor, background=True)
+            background_w += (o['width']+args.padding)
 
 plt.savefig(args.save+'.'+args.format, transparent=True, pad_inches=0, bbox_inches='tight', dpi=args.dpi)
