@@ -2,15 +2,18 @@
 ## pdb2svg: Vector outlines of macromolecular structure
 <img src="ig_example.png" alt="logo" width=700/>
 
-### Requirements
-To run `pdb2svg.py` you will need...
-* Python 3 (also biopython and shapely libraries)
-* [PyMOL](https://pymol.org/2/) (recommended)
+### Installation
+To run CellScape you will need:
+* Python 3
+* [PyMOL](https://pymol.org/2/) (optional)
 
-If you have Python 3 installed you should be able to get the dependencies with
+CellScape and its dependencies can be installed with:
+
 ```
-pip install biopython
-pip install shapely
+git clone https://github.com/jordisr/cellscape
+cd cellscape
+pip install -r requirements.txt
+pip install -e .
 ```
 
 ### Example: Immunogolobulin
@@ -33,20 +36,20 @@ set_view (\
 ```
 Copy and paste the indicated region into a new text file, `view.txt`. In the absence of this rotation matrix, `pdb2svg.py` will attemp to align the view along the N-C axis of the protein. While this works acceptably for long, linear proteins (e.g. CEACAM5) for this example we'll want to specify the view beforehand.
 
-#### Generating graphics
+#### Generating graphics from the command-line
 The following examples should yield the three images used in the top figure (from left to right):
 ```
-python pdb2svg.py --pdb 1IGT.pdb --view view.txt --outline residue --color_by chain
+cellscape cartoon --pdb 1IGT.pdb --view view.txt --outline residue --color_by chain
 ```
 The most realistic visualization projects the 3D coordinates down to two dimensions, and outlines each residue separately. Shading is used to simulate depth in a style inspired by [David Goodsell](https://pdb101.rcsb.org/motm/21).
 
 ```
-python pdb2svg.py --pdb 1IGT.pdb --view view.txt --outline chain --occlude
+cellscape cartoon --pdb 1IGT.pdb --view view.txt --outline chain --occlude
 ```
 Each chain is outlined separately. The `--occlude` flag ensures that if the chains overlap, only the portion that is visible (i.e. closer to the camera) is incorporated into the outline.
 
 ```
-python pdb2svg.py --pdb 1IGT.pdb --view view.txt --outline all
+cellscape cartoon --pdb 1IGT.pdb --view view.txt --outline all
 ```
 A simple space-filling outline of the entire structure.
 
