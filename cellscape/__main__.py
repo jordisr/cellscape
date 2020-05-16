@@ -1,7 +1,5 @@
 import argparse, sys, os
-
-def make_cartoon(args):
-    print("test")
+from .cartoon import make_cartoon
 
 def main():
     # set up argument parser
@@ -12,7 +10,31 @@ def main():
     # cartoon (formerly pdb2svg.py)
     parser_cartoon = subparsers.add_parser('cartoon', help='', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser_cartoon.set_defaults(func=make_cartoon)
-    parser_cartoon.add_argument('--test', help='')
+
+    # input/output options
+    parser_cartoon.add_argument('--pdb', help='Input PDB file')
+    parser_cartoon.add_argument('--model', type=int, default=0, help='Model number in PDB to load')
+    parser_cartoon.add_argument('--chain', default=['all'], help='Chain(s) in structure to outline', nargs='+')
+    parser_cartoon.add_argument('--view', help='File with output from PyMol get_view')
+    parser_cartoon.add_argument('--uniprot', nargs='+', help='UniProt XML file to parse for sequence/domain/topology information')
+    parser_cartoon.add_argument('--save', default='out', help='Prefix to save graphics')
+    parser_cartoon.add_argument('--format', default='svg', help='Format to save graphics', choices=['svg','pdf','png'])
+    parser_cartoon.add_argument('--export', action='store_true', help='Export Python object with structural information')
+    parser_cartoon.add_argument('--look', help='Look in directory for structure .pdb, view matrix in .txt and UniProt .xml')
+    parser_cartoon.add_argument('--align', action='store_true', default=False, help='Ignore PDB residue numbering and align to UniProt sequence to find offset')
+    parser_cartoon.add_argument('--dpi', type=int, default=300, help='DPI to use if exporting to raster formats (i.e. PNG)')
+    parser_cartoon.add_argument('--only_annotated', action='store_true', default=False, help='Ignore regions without UniProt annotations')
+
+    # visual style options
+    parser_cartoon.add_argument('--outline_by',  default='all',  choices=['all', 'chain', 'domain', 'topology', 'residue'], help='*')
+    parser_cartoon.add_argument('--color_by', default='same',  choices=['same', 'chain', 'domain', 'topology'], help='Color residues by attribute (if --outline_by residues is selected)')
+    parser_cartoon.add_argument('--occlude', action='store_true', default=False, help='Occlude residues that are not visible and draw outlines using visible residues only')
+    parser_cartoon.add_argument('--radius', default=1.5, help='Space-filling radius, in angstroms', type=float)
+    parser_cartoon.add_argument('--axes', action='store_true', default=False, help='Draw x and y axes around molecule')
+    parser_cartoon.add_argument('--c', default=['#D3D3D3'], nargs='+', help='Set default color(s) in hex RGB')
+    parser_cartoon.add_argument('--cmap', default='Set1', help='Set default color map')
+    parser_cartoon.add_argument('--ec', default='k', help='Set default edge color')
+    parser_cartoon.add_argument('--linewidth', default=0.7, type=float, help='Set default line width')
 
     # parse arguments and call corresponding command
     args = parser.parse_args()

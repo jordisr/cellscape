@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.path import Path
 from matplotlib.patches import PathPatch
@@ -12,6 +13,7 @@ from Bio.PDB import *
 from scipy import signal, interpolate
 
 def transform_from_nglview(m):
+    # take flattened 4x4 matrix from NGLView and convert to 3x3 rotation matrix
     camera_matrix = np.array(m).reshape(4,4)
     return camera_matrix[:3,:3]/np.linalg.norm(camera_matrix[:3,:3], axis=1), camera_matrix[3,:3]
 
@@ -49,9 +51,14 @@ def safe_union(polys):
     return u
 
 def get_sequential_colors(colors='Set1', n=1):
+    # see uses matplotlib.colors.ColorMap
     cmap = cm.get_cmap(colors)
-    sequential_colors = [cmap(x) for x in range(n)]
-    #sequential_colors = [cmap(x) for x in np.linspace(0.0,1.0, n)]
+    if cmap.N == 256:
+        # continuous color map
+        sequential_colors = [cmap(x) for x in np.linspace(0.0,1.0, n)]
+    else:
+        # discrete color map
+        sequential_colors = [cmap(x) for x in range(n)]
     return sequential_colors
 
 def smooth_polygon(p, level=0):
@@ -65,8 +72,11 @@ def smooth_polygon(p, level=0):
     else:
         return p
 
-def plot_polygon(poly, fc='orange', ec='k', linewidth=1, scale=1.0):
-    axs = plt.gca()
+def plot_polygon(poly, fc='orange', ec='k', linewidth=1, scale=1.0, axes=None):
+    if axes is None:
+        axs = plt.gca()
+    else:
+        axs = axes
     axs.set_aspect('equal')
     if isinstance(poly, sg.polygon.Polygon):
         xs, ys = poly.exterior.xy
@@ -81,17 +91,14 @@ def plot_polygon(poly, fc='orange', ec='k', linewidth=1, scale=1.0):
 
 class Cartoon:
     def __init__(self, file, model=0, chain="all", uniprot=None, view=True):
-        # load structure with pytraj
-        #self.traj = pt.load(file)
-        #self.xyz = self.traj.xyz[0]
-        #self.view = nv.show_pytraj(self.traj)
 
         # load structure with biopython
         parser = PDBParser()
         self.structure = parser.get_structure(file, file)[model]
         _all_chains = [c.id for c in self.structure.get_chains()]
 
-        if lc(chain) == "all":
+        # eliminate undesired chains from the biopython object
+        if chain.lower() == "all":
             self.chains = _all_chains
         else:
             self.chains = list(chain)
@@ -99,8 +106,9 @@ class Cartoon:
                 if c not in self.chains:
                     self.structure.detach_child(c)
 
+        self.use_nglview = view
         self.view_matrix = []
-        if view:
+        if self.use_nglview:
             if 'nglview' not in sys.modules:
                 import nglview as nv
             self._structure_to_view = self.structure
@@ -130,9 +138,7 @@ class Cartoon:
                 'chain':chain,
                 'id':res_id,
                 'object':res,
-                'coord':(i-len(xyz),i),
-                'xyz':xyz, # leaving in for testing
-                'com':np.mean(xyz, axis=0) # leaving in for testing
+                'coord':(i-len(xyz),i)
                 }
         self.coord = np.array(self.coord)
         self.residues_flat = [self.residues[c][i] for c in self.residues for i in self.residues[c]]
@@ -161,16 +167,13 @@ class Cartoon:
                     matrix.append(list(map(float,fields[:3])))
         self.view_matrix = np.array(matrix)[:3]
 
-        # rotate camera in nglview
-        nglv_matrix = np.identity(4)
-        nglv_matrix[:3,:3] = np.dot(self.view_matrix, self._reflect_y)
-        self.view._set_camera_orientation(list(nglv_matrix.flatten()))
-        self.view.center()
 
-        #print("view_matrix:\n", self.view_matrix)
-        #print("nglv_matrix:\n", nglv_matrix)
-        #print("set_camera_orientation:\n", list(nglv_matrix.flatten()))
-        #print("_camera_orientation:\n", np.array(self.view._camera_orientation).reshape(4,4))
+        # rotate camera in nglview
+        if self.use_nglview:
+            nglv_matrix = np.identity(4)
+            nglv_matrix[:3,:3] = np.dot(self.view_matrix, self._reflect_y)
+            self.view._set_camera_orientation(list(nglv_matrix.flatten()))
+            self.view.center()
 
     def save_view_matrix(self, p):
         self._update_view_matrix()
@@ -178,11 +181,15 @@ class Cartoon:
 
     def load_view_matrix(self, p):
         self.view_matrix = np.loadtxt(p)
+        # TODO do you need to update NGL camera view here?
 
     def outline(self, by="all", color=None, occlude=True, only_annotated=False):
-        self._update_view_matrix()
+        if self.use_nglview:
+            self._update_view_matrix()
+
         self._polygons = []
 
+        # space-filling outline of entire molecule
         self._polygon = so.unary_union([sg.Point(i).buffer(1.5) for i in self._rotate_and_project(self.view_matrix)])
 
         if by == 'all':
@@ -238,26 +245,37 @@ class Cartoon:
 
         print("Outlined some atoms!", file=sys.stdout)
 
-    def plot(self, axes=True, colors=None, smoothing=False):
+    def plot(self, axes_labels=False, colors=None, smoothing=False, do_show=True, axes=None):
+        """
+        mirroring biopython's phylogeny drawing options
+        https://biopython.org/DIST/docs/api/Bio.Phylo._utils-module.html
+        can optionally pass a matplotlib Axes instance instead of creating a new one
+        if do_show is false then return axes object
+        """
 
-        # fire up a pyplot
-        fig, axs = plt.subplots()
-        axs.set_aspect('equal')
+        if axes is None:
+            # create a new matplotlib figure if none provided
+            fig, axs = plt.subplots()
+            axs.set_aspect('equal')
 
-        if axes:
-            axs.xaxis.grid(False)
-            axs.yaxis.grid(True)
-            axs.axes.xaxis.set_ticklabels([])
+            if axes_labels:
+                axs.xaxis.grid(False)
+                axs.yaxis.grid(True)
+                axs.axes.xaxis.set_ticklabels([])
+            else:
+                plt.axis('off')
+                plt.gca().set_axis_off()
+                plt.subplots_adjust(top = 1, bottom = 0, right = 1, left = 0, hspace = 0, wspace = 0)
+                plt.margins(0,0)
+                plt.gca().xaxis.set_major_locator(plt.NullLocator())
+                plt.gca().yaxis.set_major_locator(plt.NullLocator())
         else:
-            plt.axis('off')
-            plt.gca().set_axis_off()
-            plt.subplots_adjust(top = 1, bottom = 0, right = 1, left = 0, hspace = 0, wspace = 0)
-            plt.margins(0,0)
-            plt.gca().xaxis.set_major_locator(plt.NullLocator())
-            plt.gca().yaxis.set_major_locator(plt.NullLocator())
+            assert(isinstance(axes, matplotlib.axes.Axes))
+            axs = axes
 
         # this should all be cleaned up, add more checking
         num_colors_needed = len(self._polygons)
+        # TODO What if you're repeating colors (e.g. same domains)
         default_color = 'dodgerblue'
         default_cmap = 'Set1'
 
@@ -267,16 +285,54 @@ class Cartoon:
             else:
                 sequential_colors = get_sequential_colors(colors=default_cmap, n=num_colors_needed)
         else:
-            if num_colors_needed == 1:
-                sequential_colors = [colors]
-            else:
-                sequential_colors = get_sequential_colors(colors=colors, n=num_colors_needed)
+            if isinstance(colors, str):
+                if num_colors_needed == 1:
+                    sequential_colors = [colors]
+                else:
+                    sequential_colors = get_sequential_colors(colors=colors, n=num_colors_needed)
+            elif isinstance(colors, (list, tuple)):
+                if num_colors_needed == 1:
+                    sequential_colors = [colors[0]]
+                elif num_colors_needed == len(colors):
+                    sequential_colors = colors
+                else:
+                    if len(colors) > num_colors_needed:
+                        # TODO if too many colors, just take the needed ones
+                        pass
+                    elif len(colors) < num_colors_needed:
+                        # TODO if not enough colors, just repeat
+                        pass
+
+            elif isinstance(colors, dict):
+                pass
 
         for i, p in enumerate(self._polygons):
             if smoothing:
                 poly_to_draw = smooth_polygon(p, level=1)
             else:
                 poly_to_draw = p
-            plot_polygon(poly_to_draw, fc=sequential_colors[i], scale=1.0)
+            plot_polygon(poly_to_draw, fc=sequential_colors[i], scale=1.0, axes=axs)
 
-        plt.show()
+        if do_show:
+            plt.show()
+        else:
+            return axs
+
+def make_cartoon(args):
+    """
+    minimal functionality of pdb2svg.py
+    doesn't support all arguments
+    """
+
+    # accept list of chains for backwards-compatibility
+    if len(args.chain) == 1:
+        chain = args.chain[0]
+    else:
+        chain = ''.join(args.chain)
+
+    molecule = Cartoon(args.pdb, chain=chain, view=False)
+    molecule.load_pymol_view(args.view)
+    molecule.outline(args.outline_by)
+    molecule.plot(do_show=False)
+
+    plt.savefig(args.save+'.'+args.format, axes_labels=args.axes, transparent=True, pad_inches=0, bbox_inches='tight', dpi=args.dpi)
