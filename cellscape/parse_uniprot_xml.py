@@ -7,7 +7,7 @@ import sys
 import argparse
 import json
 
-class protein:
+class UniprotRecord:
     """Data structure to hold topological/domain information"""
     def __init__(self,name):
         self.name = name
@@ -42,6 +42,9 @@ class protein:
             self.domain_segments.append(('None',last, self.chain_end))
 
 def parse_xml(xmlpath):
+    """
+    Parse Uniprot XML file to return list of record objects
+    """
     tree = ET.parse(xmlpath)
     root = tree.getroot()
     ns = '{http://uniprot.org/uniprot}'
@@ -49,7 +52,7 @@ def parse_xml(xmlpath):
 
     for entry in tree.iter(tag=ns+'entry'):
         accession = entry.find(ns+'accession')
-        sequence = protein(accession.text)
+        sequence = UniprotRecord(accession.text)
 
         for feature in entry.iter(tag=ns+'feature'):
 

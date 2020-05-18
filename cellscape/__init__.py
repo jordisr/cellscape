@@ -1,1 +1,1 @@
-from . import jupyter
+from . import cartoon

@@ -12,6 +12,8 @@ import sys
 from Bio.PDB import *
 from scipy import signal, interpolate
 
+from .parse_uniprot_xml import parse_xml
+
 def transform_from_nglview(m):
     # take flattened 4x4 matrix from NGLView and convert to 3x3 rotation matrix
     camera_matrix = np.array(m).reshape(4,4)
@@ -20,7 +22,7 @@ def transform_from_nglview(m):
 def group_by(obj, attr):
     d = dict()
     for o in obj:
-        a = o[attr]
+        a = o.get(attr, None)
         if a in d:
             d[a].append(o)
         else:
@@ -39,9 +41,10 @@ def not_none(x):
             else:
                 return str(x[1])
 
-def safe_union(polys):
+def safe_union_accumulate(polys):
     # union of list of shapely polygons
     # maybe slower than cascaded_union/unary_union but catches topology errors
+    # TODO figure out a better way of handling these exceptions
     u = polys[0]
     for p in polys:
         try:
@@ -49,6 +52,14 @@ def safe_union(polys):
         except:
             pass
     return u
+
+def safe_union(a, b):
+    # catch topology errors
+    try:
+        c = a.union(b)
+    except:
+        return a
+    return c
 
 def get_sequential_colors(colors='Set1', n=1):
     # see uses matplotlib.colors.ColorMap
@@ -72,7 +83,7 @@ def smooth_polygon(p, level=0):
     else:
         return p
 
-def plot_polygon(poly, fc='orange', ec='k', linewidth=1, scale=1.0, axes=None):
+def plot_polygon(poly, fc='orange', ec='k', linewidth=0.7, scale=1.0, axes=None):
     if axes is None:
         axs = plt.gca()
     else:
@@ -106,6 +117,7 @@ class Cartoon:
                 if c not in self.chains:
                     self.structure.detach_child(c)
 
+        # view matrix and NGLView options
         self.use_nglview = view
         self.view_matrix = []
         if self.use_nglview:
@@ -115,12 +127,6 @@ class Cartoon:
             self.view = nv.show_biopython(self._structure_to_view, sync_camera=True)
             self.view._set_sync_camera([self.view])
             self._reflect_y = np.array([[-1,0,0],[0,1,0],[0,0,-1]])
-
-        # uniprot information
-        self._uniprot_xml = uniprot
-
-        # leaving in for testing
-        self.xyz = np.concatenate([np.array([list(atom.get_vector()) for atom in self.structure[chain].get_atoms()]) for chain in self.chains])
 
         # data structure holding residue information
         self.residues = dict()
@@ -141,7 +147,32 @@ class Cartoon:
                 'coord':(i-len(xyz),i)
                 }
         self.coord = np.array(self.coord)
-        self.residues_flat = [self.residues[c][i] for c in self.residues for i in self.residues[c]]
+
+        # uniprot information
+        self._uniprot_xml = uniprot
+        if self._uniprot_xml is not None:
+            self._preprocess_uniprot(self._uniprot_xml)
+
+    def _preprocess_uniprot(self, xml):
+        # TODO support more than one XML file (e.g. for differnet chains)
+        self._uniprot = parse_xml(xml[0])[0]
+
+        # TODO add sequence alignment to find this automatically
+        uniprot_chain = self.chains[0]
+        uniprot_offset = 0
+
+        if len(self._uniprot.domains) > 0:
+            self._annotate_residues_from_uniprot(self._uniprot.domains, name_key="domain", residues=self.residues[uniprot_chain], offset=uniprot_offset)
+
+        if len(self._uniprot.topology) > 0:
+            self._annotate_residues_from_uniprot(self._uniprot.topology, name_key="topology", residues=self.residues[uniprot_chain], offset=uniprot_offset)
+
+    def _annotate_residues_from_uniprot(self, ranges, name_key, residues, offset=0):
+        for row in ranges:
+            (name, start, end) = row
+            for r in range(start, end+1):
+                if (r+offset) in residues:
+                    residues[r+offset][name_key] = name
 
     def _rotate_and_project(self, m):
         return np.dot(self.coord, m)[:,:2]
@@ -167,7 +198,6 @@ class Cartoon:
                     matrix.append(list(map(float,fields[:3])))
         self.view_matrix = np.array(matrix)[:3]
 
-
         # rotate camera in nglview
         if self.use_nglview:
             nglv_matrix = np.identity(4)
@@ -184,15 +214,18 @@ class Cartoon:
         # TODO do you need to update NGL camera view here?
 
     def outline(self, by="all", color=None, occlude=True, only_annotated=False):
+
+        # collapse chain hierarchy into flat list
+        self.residues_flat = [self.residues[c][i] for c in self.residues for i in self.residues[c]]
+
         if self.use_nglview:
             self._update_view_matrix()
 
         self._polygons = []
 
-        # space-filling outline of entire molecule
-        self._polygon = so.unary_union([sg.Point(i).buffer(1.5) for i in self._rotate_and_project(self.view_matrix)])
-
         if by == 'all':
+            # space-filling outline of entire molecule
+            self._polygon = so.unary_union([sg.Point(i).buffer(1.5) for i in self._rotate_and_project(self.view_matrix)])
             self._polygons.append(self._polygon)
 
         elif by == 'residue':
@@ -219,29 +252,32 @@ class Cartoon:
                     if not only_annotated or res.get(by) is not None:
                         space_filling = sg.Point(coords[0]).buffer(1.5)
                         for i in coords:
-                            space_filling = space_filling.union(sg.Point(i).buffer(1.5))
+                            #space_filling = space_filling.union(sg.Point(i).buffer(1.5))
+                            space_filling = safe_union(space_filling, sg.Point(i).buffer(1.5))
                         #space_filling = so.cascaded_union([sg.Point(i*10+np.random.random(3)).buffer(15) for i in coords])
                         if not view_object:
                             view_object = space_filling
                         else:
                             if view_object.disjoint(space_filling):
-                                view_object = view_object.union(space_filling)
+                                #view_object = view_object.union(space_filling)
+                                view_object = safe_union(view_object, space_filling)
                                 region_polygons[res.get(by)].append(space_filling)
                             elif view_object.contains(space_filling):
                                 pass
                             else:
                                 region_polygons[res.get(by)].append(space_filling.difference(view_object))
-                                view_object = view_object.union(space_filling)
+                                #view_object = view_object.union(space_filling)
+                                view_object = safe_union(view_object, space_filling)
 
                 for i, (region_name, region_polygon) in enumerate(region_polygons.items()):
                     if not only_annotated or region_name is not None:
-                        self._polygons.append(safe_union(region_polygon))
+                        self._polygons.append(safe_union_accumulate(region_polygon))
             else:
                 residue_groups = group_by(self.residues_flat, by)
                 for group_i, (group_name, group_res) in enumerate(sorted(residue_groups.items(), key=not_none)):
                     if not only_annotated or group_name is not None:
                         group_coords = np.concatenate([rotated_coord[range(*res['coord'])] for r in group_res])
-                        self._polygons.append(space_filling = so.cascaded_union([sg.Point(i).buffer(1.5) for i in group_coords]))
+                        self._polygons.append(space_filling = safe_union_accumulate([sg.Point(i).buffer(1.5) for i in group_coords]))
 
         print("Outlined some atoms!", file=sys.stdout)
 
@@ -325,14 +361,14 @@ def make_cartoon(args):
     """
 
     # accept list of chains for backwards-compatibility
+    # convert to string e.g. ABCD for current interface
     if len(args.chain) == 1:
         chain = args.chain[0]
     else:
         chain = ''.join(args.chain)
 
-    molecule = Cartoon(args.pdb, chain=chain, view=False)
+    molecule = Cartoon(args.pdb, chain=chain, model=args.model, uniprot=args.uniprot, view=False)
     molecule.load_pymol_view(args.view)
     molecule.outline(args.outline_by)
-    molecule.plot(do_show=False)
-
-    plt.savefig(args.save+'.'+args.format, axes_labels=args.axes, transparent=True, pad_inches=0, bbox_inches='tight', dpi=args.dpi)
+    molecule.plot(do_show=False, linewidth=args.linewidth)
+    plt.savefig(args.save+'.'+args.format, axes_labels=args.axes, dpi=args.dpi, transparent=True, pad_inches=0, bbox_inches='tight')

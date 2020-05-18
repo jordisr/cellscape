@@ -12,7 +12,7 @@ def main():
     parser_cartoon.set_defaults(func=make_cartoon)
 
     # input/output options
-    parser_cartoon.add_argument('--pdb', help='Input PDB file')
+    parser_cartoon.add_argument('--pdb', help='Input PDB file', required=True)
     parser_cartoon.add_argument('--model', type=int, default=0, help='Model number in PDB to load')
     parser_cartoon.add_argument('--chain', default=['all'], help='Chain(s) in structure to outline', nargs='+')
     parser_cartoon.add_argument('--view', help='File with output from PyMol get_view')
@@ -20,8 +20,8 @@ def main():
     parser_cartoon.add_argument('--save', default='out', help='Prefix to save graphics')
     parser_cartoon.add_argument('--format', default='svg', help='Format to save graphics', choices=['svg','pdf','png'])
     parser_cartoon.add_argument('--export', action='store_true', help='Export Python object with structural information')
-    parser_cartoon.add_argument('--look', help='Look in directory for structure .pdb, view matrix in .txt and UniProt .xml')
-    parser_cartoon.add_argument('--align', action='store_true', default=False, help='Ignore PDB residue numbering and align to UniProt sequence to find offset')
+    #parser_cartoon.add_argument('--look', help='Look in directory for structure .pdb, view matrix in .txt and UniProt .xml')
+    #parser_cartoon.add_argument('--align', action='store_true', default=False, help='Ignore PDB residue numbering and align to UniProt sequence to find offset')
     parser_cartoon.add_argument('--dpi', type=int, default=300, help='DPI to use if exporting to raster formats (i.e. PNG)')
     parser_cartoon.add_argument('--only_annotated', action='store_true', default=False, help='Ignore regions without UniProt annotations')
 
