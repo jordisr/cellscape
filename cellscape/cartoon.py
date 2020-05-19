@@ -5,10 +5,12 @@ from matplotlib.path import Path
 from matplotlib.patches import PathPatch
 from matplotlib import lines, text, cm
 import shapely.geometry as sg
+from matplotlib.colors import LinearSegmentedColormap
 import shapely.ops as so
 import pickle
 import os
 import sys
+import operator
 from Bio.PDB import *
 from scipy import signal, interpolate
 
@@ -61,6 +63,27 @@ def safe_union(a, b):
         return a
     return c
 
+def shades_from_rgb(color, w=0.3):
+    # define custom Lighter Color => Color => Darker Color cmap
+    if istype(color, str):
+        assert(h[0] == "#" and len(h) == 7)
+        r = int(h[1:3], 16)
+        g = int(h[3:5], 16)
+        b = int(h[5:7], 16)
+    elif istype(color, (tuple, list)):
+        assert(len(color) == 3)
+        (r, g, b) = h
+    h, l, s = colorsys.rgb_to_hls(r/255,g/255,b/255)
+
+    # lighter and darker versions of color in HLS space
+    c3 = (h, min(l+(1-w)*l, 1), s)
+    c2 = (h, l, s)
+    c1 = (h, max(l-(1-w)*l, 0), s)
+
+    # convert back to RGB and return colormap
+    colors = [colorsys.hls_to_rgb(c[0], c[1], c[2]) for c in [c1, c2, c3]]
+    return LinearSegmentedColormap.from_list("shade", colors)
+
 def get_sequential_colors(colors='Set1', n=1):
     # see uses matplotlib.colors.ColorMap
     cmap = cm.get_cmap(colors)
@@ -102,6 +125,9 @@ def plot_polygon(poly, fc='orange', ec='k', linewidth=0.7, scale=1.0, axes=None)
 
 class Cartoon:
     def __init__(self, file, model=0, chain="all", uniprot=None, view=True):
+
+        # check whether outline has been generated yet
+        self.outline = None
 
         # load structure with biopython
         parser = PDBParser()
@@ -279,9 +305,10 @@ class Cartoon:
                         group_coords = np.concatenate([rotated_coord[range(*res['coord'])] for r in group_res])
                         self._polygons.append(space_filling = safe_union_accumulate([sg.Point(i).buffer(1.5) for i in group_coords]))
 
+        self.outline = by
         print("Outlined some atoms!", file=sys.stdout)
 
-    def plot(self, axes_labels=False, colors=None, smoothing=False, do_show=True, axes=None):
+    def plot(self, axes_labels=False, colors=None, smoothing=False, do_show=True, axes=None, save=None, dpi=300, format="pdf"):
         """
         mirroring biopython's phylogeny drawing options
         https://biopython.org/DIST/docs/api/Bio.Phylo._utils-module.html
@@ -308,6 +335,7 @@ class Cartoon:
         else:
             assert(isinstance(axes, matplotlib.axes.Axes))
             axs = axes
+        self._axes= axs
 
         # this should all be cleaned up, add more checking
         num_colors_needed = len(self._polygons)
@@ -349,10 +377,41 @@ class Cartoon:
                 poly_to_draw = p
             plot_polygon(poly_to_draw, fc=sequential_colors[i], scale=1.0, axes=axs)
 
+        if save is not None:
+            plt.savefig("{}.{}".format(save, format), dpi=dpi, transparent=True, pad_inches=0, bbox_inches='tight')
+
         if do_show:
             plt.show()
         else:
             return axs
+
+    def export(self, fname, axes=None):
+        """
+        Find polygons in a matplotlib axes (after self.plot()) and export to pickle for scene building
+        """
+
+        if axes is None:
+            ax = self._axes
+        else:
+            ax = axes
+
+        # output summary line
+        rotated_coord = np.dot(self.coord, self.view_matrix)
+        image_width = np.max(rotated_coord[:,0]) - np.min(rotated_coord[:,0])
+        image_height = np.max(rotated_coord[:,1]) - np.min(rotated_coord[:,1])
+        start_coord = np.mean(rotated_coord[:50])
+        end_coord = np.mean(rotated_coord[:-50])
+        bottom_coord = min(rotated_coord, key=operator.itemgetter(1))
+        top_coord = max(rotated_coord, key=operator.itemgetter(1))
+        print('\t'.join(map(str, [image_height, image_width, bottom_coord, top_coord])))
+
+        data = {'polygons':[], 'width':image_width, 'height':image_height, 'start':start_coord, 'end':end_coord, 'bottom':bottom_coord, 'top':top_coord}
+        # TODO does this account for patches with holes
+        for o in ax.findobj(matplotlib.patches.Polygon):
+            data['polygons'].append(o)
+
+        with open('{}.pickle'.format(fname),'wb') as f:
+            pickle.dump(data, f)
 
 def make_cartoon(args):
     """
@@ -370,5 +429,4 @@ def make_cartoon(args):
     molecule = Cartoon(args.pdb, chain=chain, model=args.model, uniprot=args.uniprot, view=False)
     molecule.load_pymol_view(args.view)
     molecule.outline(args.outline_by)
-    molecule.plot(do_show=False, linewidth=args.linewidth)
-    plt.savefig(args.save+'.'+args.format, axes_labels=args.axes, dpi=args.dpi, transparent=True, pad_inches=0, bbox_inches='tight')
+    molecule.plot(do_show=False, axes_labels=args.axes, dpi=args.dpi, save=args.save, format=args.format)
