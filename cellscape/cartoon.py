@@ -16,10 +16,16 @@ from scipy import signal, interpolate
 
 from .parse_uniprot_xml import parse_xml
 
-def transform_from_nglview(m):
+def matrix_from_nglview(m):
     # take flattened 4x4 matrix from NGLView and convert to 3x3 rotation matrix
     camera_matrix = np.array(m).reshape(4,4)
     return camera_matrix[:3,:3]/np.linalg.norm(camera_matrix[:3,:3], axis=1), camera_matrix[3,:3]
+
+def matrix_to_nglview(m):
+    # take 3x3 rotation matrix and convert to flattened 4x4 for NGLView
+    nglv_matrix = np.identity(4)
+    nglv_matrix[:3,:3] = np.dot(m, np.array([[-1,0,0],[0,1,0],[0,0,-1]]))
+    return list(nglv_matrix.flatten())
 
 def group_by(obj, attr):
     d = dict()
@@ -127,7 +133,7 @@ class Cartoon:
     def __init__(self, file, model=0, chain="all", uniprot=None, view=True):
 
         # check whether outline has been generated yet
-        self.outline = None
+        self.outline_by = None
 
         # load structure with biopython
         parser = PDBParser()
@@ -147,7 +153,7 @@ class Cartoon:
         self.use_nglview = view
         self.view_matrix = []
         if self.use_nglview:
-            if 'nglview' not in sys.modules:
+            if 'nglview' not in sys.modules or 'nv' not in sys.modules:
                 import nglview as nv
             self._structure_to_view = self.structure
             self.view = nv.show_biopython(self._structure_to_view, sync_camera=True)
@@ -200,19 +206,23 @@ class Cartoon:
                 if (r+offset) in residues:
                     residues[r+offset][name_key] = name
 
-    def _rotate_and_project(self, m):
-        return np.dot(self.coord, m)[:,:2]
-
     def _coord(self, t):
         return self.coord[t[0]:t[1]]
 
     def _update_view_matrix(self):
         # check if camera orientation has been specified from nglview
         if len(self.view._camera_orientation) == 16:
-            m, t = transform_from_nglview(self.view._camera_orientation)
+            m, t = matrix_from_nglview(self.view._camera_orientation)
             self.view_matrix = np.dot(m, self._reflect_y)
         elif len(self.view_matrix) == 0:
             self.view_matrix = np.identity(3)
+
+    def _set_nglview_orientation(self, m):
+        # m is 3x3 rotation matrix
+        if self.use_nglview:
+            nglv_matrix = matrix_to_nglview(self.view_matrix)
+            self.view._set_camera_orientation(nglv_matrix)
+            self.view.center()
 
     def load_pymol_view(self, file):
         # read rotation matrix from PyMol get_view command
@@ -225,11 +235,7 @@ class Cartoon:
         self.view_matrix = np.array(matrix)[:3]
 
         # rotate camera in nglview
-        if self.use_nglview:
-            nglv_matrix = np.identity(4)
-            nglv_matrix[:3,:3] = np.dot(self.view_matrix, self._reflect_y)
-            self.view._set_camera_orientation(list(nglv_matrix.flatten()))
-            self.view.center()
+        self._set_nglview_orientation(self.view_matrix)
 
     def save_view_matrix(self, p):
         self._update_view_matrix()
@@ -237,7 +243,7 @@ class Cartoon:
 
     def load_view_matrix(self, p):
         self.view_matrix = np.loadtxt(p)
-        # TODO do you need to update NGL camera view here?
+        self._set_nglview_orientation(self.view_matrix)
 
     def outline(self, by="all", color=None, occlude=True, only_annotated=False):
 
@@ -247,19 +253,27 @@ class Cartoon:
         if self.use_nglview:
             self._update_view_matrix()
 
+        # transform atomic coordinates using view matrix
+        self.rotated_coord = np.dot(self.coord, self.view_matrix)
+
+        # recenter coordinates on lower left edge of bounding box
+        offset_x = np.min(self.rotated_coord[:,0])
+        offset_y = np.min(self.rotated_coord[:,1])
+        self.rotated_coord -= np.array([offset_x, offset_y, 0])
+
         self._polygons = []
 
         if by == 'all':
             # space-filling outline of entire molecule
-            self._polygon = so.unary_union([sg.Point(i).buffer(1.5) for i in self._rotate_and_project(self.view_matrix)])
+            self._polygon = so.unary_union([sg.Point(i).buffer(1.5) for i in self.rotated_coord[:,:2]])
             self._polygons.append(self._polygon)
 
         elif by == 'residue':
-            rotated_coord = np.dot(self.coord, self.view_matrix)
-            z_sorted_residues = sorted(self.residues_flat, key=lambda res: np.mean(rotated_coord[range(*res['coord'])]))
+            z_sorted_residues = sorted(self.residues_flat, key=lambda res: np.mean(self.rotated_coord[range(*res['coord'])]))
 
             for res in z_sorted_residues:
-                coords = rotated_coord[range(*res['coord'])]
+                # pick range of atomic coordinates out of main data structure
+                coords = self.rotated_coord[range(*res['coord'])]
                 group_outline = so.cascaded_union([sg.Point(i).buffer(1.5) for i in coords])
                 self._polygons.append(group_outline)
 
@@ -268,13 +282,12 @@ class Cartoon:
             if by in ['domain', 'topology']:
                 assert(self._uniprot_xml is not None)
 
-            rotated_coord = np.dot(self.coord, self.view_matrix)
             residue_groups = group_by(self.residues_flat, by)
             if occlude:
                 region_polygons = {c:[] for c in sorted(residue_groups.keys(), key=not_none)}
                 view_object = None
                 for res in reversed(self.residues_flat):
-                    coords = rotated_coord[range(*res['coord'])]
+                    coords = self.rotated_coord[range(*res['coord'])]
                     if not only_annotated or res.get(by) is not None:
                         space_filling = sg.Point(coords[0]).buffer(1.5)
                         for i in coords:
@@ -302,11 +315,11 @@ class Cartoon:
                 residue_groups = group_by(self.residues_flat, by)
                 for group_i, (group_name, group_res) in enumerate(sorted(residue_groups.items(), key=not_none)):
                     if not only_annotated or group_name is not None:
-                        group_coords = np.concatenate([rotated_coord[range(*res['coord'])] for r in group_res])
-                        self._polygons.append(space_filling = safe_union_accumulate([sg.Point(i).buffer(1.5) for i in group_coords]))
+                        group_coords = np.concatenate([self.rotated_coord[range(*r['coord'])] for r in group_res])
+                        self._polygons.append(safe_union_accumulate([sg.Point(i).buffer(1.5) for i in group_coords]))
 
-        self.outline = by
-        print("Outlined some atoms!", file=sys.stdout)
+        self.outline_by = by
+        print("Outlined some atoms!", file=sys.stderr)
 
     def plot(self, axes_labels=False, colors=None, smoothing=False, do_show=True, axes=None, save=None, dpi=300, format="pdf"):
         """
@@ -396,14 +409,13 @@ class Cartoon:
             ax = axes
 
         # output summary line
-        rotated_coord = np.dot(self.coord, self.view_matrix)
-        image_width = np.max(rotated_coord[:,0]) - np.min(rotated_coord[:,0])
-        image_height = np.max(rotated_coord[:,1]) - np.min(rotated_coord[:,1])
-        start_coord = np.mean(rotated_coord[:50])
-        end_coord = np.mean(rotated_coord[:-50])
-        bottom_coord = min(rotated_coord, key=operator.itemgetter(1))
-        top_coord = max(rotated_coord, key=operator.itemgetter(1))
-        print('\t'.join(map(str, [image_height, image_width, bottom_coord, top_coord])))
+        image_width = np.max(self.rotated_coord[:,0]) - np.min(self.rotated_coord[:,0])
+        image_height = np.max(self.rotated_coord[:,1]) - np.min(self.rotated_coord[:,1])
+        start_coord = np.mean(self.rotated_coord[:50])
+        end_coord = np.mean(self.rotated_coord[:-50])
+        bottom_coord = min(self.rotated_coord, key=operator.itemgetter(1))
+        top_coord = max(self.rotated_coord, key=operator.itemgetter(1))
+        #print('\t'.join(map(str, [image_height, image_width, bottom_coord, top_coord])))
 
         data = {'polygons':[], 'width':image_width, 'height':image_height, 'start':start_coord, 'end':end_coord, 'bottom':bottom_coord, 'top':top_coord}
         # TODO does this account for patches with holes
@@ -428,5 +440,5 @@ def make_cartoon(args):
 
     molecule = Cartoon(args.pdb, chain=chain, model=args.model, uniprot=args.uniprot, view=False)
     molecule.load_pymol_view(args.view)
-    molecule.outline(args.outline_by)
+    molecule.outline(args.outline_by, occlude=args.occlude)
     molecule.plot(do_show=False, axes_labels=args.axes, dpi=args.dpi, save=args.save, format=args.format)

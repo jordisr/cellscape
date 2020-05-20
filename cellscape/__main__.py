@@ -9,7 +9,7 @@ def main():
     subparsers.required=True
 
     # cartoon (formerly pdb2svg.py)
-    parser_cartoon = subparsers.add_parser('cartoon', help='', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser_cartoon = subparsers.add_parser('cartoon', help='', formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="WARNING: this software is currently being developed and may not have all the functionality of pdb2svg.py")
     parser_cartoon.set_defaults(func=make_cartoon)
     # input/output options
     parser_cartoon.add_argument('--pdb', help='Input PDB file', required=True)
@@ -28,12 +28,12 @@ def main():
     parser_cartoon.add_argument('--outline_by',  default='all',  choices=['all', 'chain', 'domain', 'topology', 'residue'], help='*')
     parser_cartoon.add_argument('--color_by', default='same',  choices=['same', 'chain', 'domain', 'topology'], help='Color residues by attribute (if --outline_by residues is selected)')
     parser_cartoon.add_argument('--occlude', action='store_true', default=False, help='Occlude residues that are not visible and draw outlines using visible residues only')
-    parser_cartoon.add_argument('--radius', default=1.5, help='Space-filling radius, in angstroms', type=float)
+    #parser_cartoon.add_argument('--radius', default=1.5, help='Space-filling radius, in angstroms', type=float)
     parser_cartoon.add_argument('--axes', action='store_true', default=False, help='Draw x and y axes around molecule')
-    parser_cartoon.add_argument('--c', default=['#D3D3D3'], nargs='+', help='Set default color(s) in hex RGB')
-    parser_cartoon.add_argument('--cmap', default='Set1', help='Set default color map')
-    parser_cartoon.add_argument('--ec', default='k', help='Set default edge color')
-    parser_cartoon.add_argument('--linewidth', default=0.7, type=float, help='Set default line width')
+    #parser_cartoon.add_argument('--c', default=['#D3D3D3'], nargs='+', help='Set default color(s) in hex RGB')
+    #parser_cartoon.add_argument('--cmap', default='Set1', help='Set default color map')
+    #parser_cartoon.add_argument('--ec', default='k', help='Set default edge color')
+    #parser_cartoon.add_argument('--linewidth', default=0.7, type=float, help='Set default line width')
 
     # scene (formerly compose_scene.py)
     parser_scene = subparsers.add_parser('scene', help='', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
