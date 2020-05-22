@@ -34,7 +34,7 @@ set_view (\
    455.182373047,  634.163574219,  -20.000000000 )
 ### cut above here and paste into script ###
 ```
-Copy and paste the indicated region into a new text file, `view.txt`. In the absence of this rotation matrix, `pdb2svg.py` will attemp to align the view along the N-C axis of the protein. While this works acceptably for long, linear proteins (e.g. CEACAM5) for this example we'll want to specify the view beforehand.
+Copy and paste the indicated region into a new text file, `view.txt`. In the absence of this rotation matrix, the program will attempt to align the view along the N-C axis of the protein. While this works acceptably for long, linear proteins (e.g. CEACAM5) for this example we'll want to specify the view beforehand.
 
 #### Generating graphics from the command-line
 The following examples should yield the three images used in the top figure (from left to right):
@@ -53,4 +53,4 @@ cellscape cartoon --pdb 1IGT.pdb --view view.txt --outline all
 ```
 A simple space-filling outline of the entire structure.
 
-Full description of all options is available by running `python pdb2svg.py --help`.
+Full description of all options is available by running `cellscape cartoon -h`.

@@ -15,7 +15,7 @@ import csv
 def rotation_matrix_2d(theta):
     return np.array([[np.cos(theta), -1*np.sin(theta)],[np.sin(theta), np.cos(theta)]])
 
-def draw_object(o, axs, offset=[0,0], flip=False, background=False, scaling=1, zorder=3, recenter=None, color=None):
+def draw_object(o, axs, offset=[0,0], flip=False, background=False, scaling=1, zorder=3, recenter=None, color=None, linewidth=None):
     """
     add object to axes
     abstracting some of the drawing details, might want to move to a class
@@ -23,10 +23,13 @@ def draw_object(o, axs, offset=[0,0], flip=False, background=False, scaling=1, z
     """
 
     # use thinner line with many objects (e.g. with --residues)
-    if len(o['polygons']) > 50:
-        lw=0.1
+    if linewidth is None:
+        if len(o['polygons']) > 50:
+            lw=0.1
+        else:
+            lw=0.2
     else:
-        lw=0.5
+        lw = linewidth
 
     for p in o['polygons']:
 
@@ -36,7 +39,11 @@ def draw_object(o, axs, offset=[0,0], flip=False, background=False, scaling=1, z
             # optionally shift coordinates before rotation
             xy -= recenter
         if flip:
+            # TODO easier to use object height/width if accurate
             xy = np.dot(xy, np.array([[-1,0],[0,-1]]))
+            offset_x = np.min(xy[:,0])
+            offset_y = np.min(xy[:,1])
+            xy -= np.array([offset_x, offset_y])
 
         # either use existing color or recolor with global color scheme
         if color is not None:
@@ -184,11 +191,12 @@ def make_scene(args):
         else:
             cmap = ListedColormap(args.recolor_cmap)
         color_scheme = dict()
-        for i,c in enumerate(protein_names):
+        for i,c in enumerate(object_list):
+            name = c['name']
             if isinstance(cmap, ListedColormap):
-                color_scheme[c] = cmap(i)
+                color_scheme[name] = cmap(i)
             else:
-                color_scheme[c] = cmap(i/len(protein_names))
+                color_scheme[name] = cmap(i/len(object_list))
 
     if args.membrane is not None:
         total_width = np.sum([o['width'] for o in object_list])+len(object_list)*args.padding
@@ -219,39 +227,19 @@ def make_scene(args):
 
     # draw molecules
     w=0
-    if args.membrane_interface:
-        if len(object_list) == 2:
-            # test out interface with two proteins only, later expand to protein pairs
-            bottom_obj = object_list[0]
-            top_obj = object_list[1]
-
-            membrane2 = membrane_cartoon(width=total_width, axes=axs, thickness=40, base_y=bottom_obj['height']+top_obj['height']+20)
-            membrane2.flat()
-            membrane2.draw(lipids=True)
-
-            y_offset = membrane.height_at(w+bottom_obj['bottom'][0])-10
-            draw_object(bottom_obj, axs, offset=[100, y_offset])
-            draw_object(top_obj, offset=[100+top_obj['top'][0]+bottom_obj['top'][0], bottom_obj['height']+top_obj['height']+10], flip=True) # testing out rotations
+    for i, o in enumerate(object_list):
+        y_offset = membrane.height_at(w+o['bottom'][0])-10
+        if args.recolor:
+            color = color_scheme[o['name']]
         else:
-            for i, o in enumerate(object_list):
-                y_offset = membrane.height_at(w+o['bottom'][0])-10
-                draw_object(o, axs, offset=[w, y_offset])
-                draw_object(o, axs, offset=[w+o['width'], 2*o['height']+5], flip=True) # testing out rotations
-                w += o['width']+args.padding
-    else:
-        for i, o in enumerate(object_list):
-            y_offset = membrane.height_at(w+o['bottom'][0])-10
-            if args.recolor:
-                color = color_scheme[o['name']]
-            else:
-                color = None
-            draw_object(o, axs, offset=[w, y_offset], color=color)
-            w += o['width']+args.padding
+            color = None
+        draw_object(o, axs, offset=[w, y_offset], color=color)
+        w += o['width']+args.padding
 
-        if args.background:
-            background_w=0
-            for i, o in enumerate(background_object_list):
-                draw_object(o, axs, offset=[background_w, 0], scaling=scaling_factor, background=True)
-                background_w += (o['width']+args.padding)
+    if args.background:
+        background_w=0
+        for i, o in enumerate(background_object_list):
+            draw_object(o, axs, offset=[background_w, 0], scaling=scaling_factor, background=True)
+            background_w += (o['width']+args.padding)
 
     plt.savefig(args.save+'.'+args.format, transparent=True, pad_inches=0, bbox_inches='tight', dpi=args.dpi)

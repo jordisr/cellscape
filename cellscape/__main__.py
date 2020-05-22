@@ -50,7 +50,6 @@ def main():
     parser_scene.add_argument('--order_by', default='input', choices=['input', 'random', 'height'], help='How to order proteins in scene')
     parser_scene.add_argument('--recolor', action='store_true', default=False, help='Recolor proteins in scene')
     parser_scene.add_argument('--recolor_cmap', default=['hsv'], nargs='+', help='Named cmap or color scheme for re-coloring')
-    parser_scene.add_argument('--membrane_interface', action='store_true', default=False, help=argparse.SUPPRESS) # option under development
     # for simulating according to stoichiometry
     parser_scene.add_argument('--csv', help='Table of protein information')
     parser_scene.add_argument('--sample_from', help='Column to use for sampling', default='stoichiometry')
