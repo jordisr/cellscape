@@ -12,11 +12,17 @@ import pickle
 import os
 import sys
 import operator
+import colorsys
+import warnings
 from Bio.PDB import *
 from scipy import signal, interpolate
 import time
 
 from .parse_uniprot_xml import parse_xml
+
+# silence warnings from Biopython that might pop up when loading the PDB
+from Bio import BiopythonWarning
+warnings.simplefilter('ignore', BiopythonWarning)
 
 def matrix_from_nglview(m):
     # take flattened 4x4 matrix from NGLView and convert to 3x3 rotation matrix
@@ -71,26 +77,13 @@ def safe_union(a, b):
         return a
     return c
 
-def shades_from_rgb(color, w=0.3):
-    # define custom Lighter Color => Color => Darker Color cmap
-    if istype(color, str):
-        assert(h[0] == "#" and len(h) == 7)
-        r = int(h[1:3], 16)
-        g = int(h[3:5], 16)
-        b = int(h[5:7], 16)
-    elif istype(color, (tuple, list)):
-        assert(len(color) == 3)
-        (r, g, b) = h
-    h, l, s = colorsys.rgb_to_hls(r/255,g/255,b/255)
-
-    # lighter and darker versions of color in HLS space
-    c3 = (h, min(l+(1-w)*l, 1), s)
-    c2 = (h, l, s)
-    c1 = (h, max(l-(1-w)*l, 0), s)
-
-    # convert back to RGB and return colormap
-    colors = [colorsys.hls_to_rgb(c[0], c[1], c[2]) for c in [c1, c2, c3]]
-    return LinearSegmentedColormap.from_list("shade", colors)
+def shade_from_color(color, x, range):
+    (r, g, b, a) = mcolors.to_rgba(color)
+    h, l, s = colorsys.rgb_to_hls(r,g,b)
+    l_dark = max(l-range/2, 0)
+    l_light = min(l+range/2, 1)
+    l_new = l_dark*(1-x) + l_light*x
+    return colorsys.hls_to_rgb(h, l_new, s)
 
 def get_sequential_colors(colors='Set1', n=1):
     # sample n colors from a colormap
@@ -343,7 +336,7 @@ class Cartoon:
         self.outline_by = by
         print("Outlined some atoms!", file=sys.stderr)
 
-    def plot(self, axes_labels=False, colors=None, color_residues_by=None, shading=True, smoothing=False, do_show=True, axes=None, save=None, dpi=300, format="pdf"):
+    def plot(self, axes_labels=False, colors=None, color_residues_by=None, shading=False, shading_range=0.6, smoothing=False, do_show=True, axes=None, save=None, dpi=300):
         """
         mirroring biopython's phylogeny drawing options
         https://biopython.org/DIST/docs/api/Bio.Phylo._utils-module.html
@@ -357,6 +350,11 @@ class Cartoon:
             - dict of names to colors e.g. {"domain A": "red", "domain B":"blue"} (dict)
             - named discrete or continuous color scheme e.g. "Set1" (string)
         """
+
+        if shading:
+            z_coord = self.rotated_coord[:,2]
+            def rescale_coord(z):
+                return (z-np.min(z_coord))/(np.max(z_coord)-np.min(z_coord))
 
         if axes is None:
             # create a new matplotlib figure if none provided
@@ -391,7 +389,7 @@ class Cartoon:
         else:
             num_colors_needed = len(self._polygons)
 
-        default_color = 'lightgray'
+        default_color = '#D3D3D3'
         default_cmap = 'Set1'
         named_colors = [*mcolors.BASE_COLORS.keys(), *mcolors.TABLEAU_COLORS.keys(), *mcolors.CSS4_COLORS.keys(), *mcolors.XKCD_COLORS.keys()]
 
@@ -415,11 +413,13 @@ class Cartoon:
                     elif num_colors_needed == len(colors):
                         sequential_colors = colors
 
-        if len(sequential_colors) > 0:
-            color_map = {k:sequential_colors[i] for i,k in enumerate(residue_color_groups.keys())}
-
         if self.outline_by == "residue":
-            # TODO clean this up
+            # TODO clean this section up
+            if len(sequential_colors) > 0:
+                color_map = {k:sequential_colors[i] for i,k in enumerate(residue_color_groups.keys())}
+            else:
+                color_map = colors
+
             z_sorted_residues = sorted(self.residues_flat, key=lambda res: np.mean(res["xyz"][:,-1]))
             for i, p in enumerate(z_sorted_residues):
                 if smoothing:
@@ -428,9 +428,12 @@ class Cartoon:
                     poly_to_draw = p["polygon"]
                 color_value = p.get(color_residues_by)
                 if isinstance(colors, dict):
-                    fc = colors[color_value]
+                    fc = color_map[color_value]
                 else:
-                    fc = color_map.get(color_value, default_color)
+                    fc = color_map.get(color_value, sequential_colors[0])
+
+                if shading:
+                    fc = shade_from_color(fc, rescale_coord(np.mean(p["xyz"][:,2])), range=shading_range)
 
                 plot_polygon(poly_to_draw, fc=fc, scale=1.0, axes=axs)
 
@@ -445,7 +448,7 @@ class Cartoon:
                 plot_polygon(poly_to_draw, fc=sequential_colors[i], scale=1.0, axes=axs)
 
         if save is not None:
-            plt.savefig("{}.{}".format(save, format), dpi=dpi, transparent=True, pad_inches=0, bbox_inches='tight')
+            plt.savefig(save, dpi=dpi, transparent=True, pad_inches=0, bbox_inches='tight')
 
         if do_show:
             plt.show()
@@ -492,11 +495,8 @@ def make_cartoon(args):
         chain = ''.join(args.chain)
 
     molecule = Cartoon(args.pdb, chain=chain, model=args.model, uniprot=args.uniprot, view=False)
-    if args.view[-3:] == "npy":
-        molecule.load_view_matrix(args.view)
-    else:
-        molecule.load_pymol_view(args.view)
+    molecule.load_pymol_view(args.view)
     molecule.outline(args.outline_by, occlude=args.occlude, radius=args.radius)
     if args.outline_by == "residue":
         color_residues_by = args.color_by
-    molecule.plot(do_show=False, axes_labels=args.axes, color_residues_by=color_residues_by, dpi=args.dpi, save=args.save, format=args.format)
+    molecule.plot(do_show=False, axes_labels=args.axes, color_residues_by=color_residues_by, dpi=args.dpi, save="{}.{}".format(args.save, args.format), shading=True)
