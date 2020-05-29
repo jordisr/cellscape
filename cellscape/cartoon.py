@@ -4,8 +4,9 @@ import matplotlib.pyplot as plt
 from matplotlib.path import Path
 from matplotlib.patches import PathPatch
 from matplotlib import lines, text, cm
-import shapely.geometry as sg
+import matplotlib.colors as mcolors
 from matplotlib.colors import LinearSegmentedColormap
+import shapely.geometry as sg
 import shapely.ops as so
 import pickle
 import os
@@ -13,6 +14,7 @@ import sys
 import operator
 from Bio.PDB import *
 from scipy import signal, interpolate
+import time
 
 from .parse_uniprot_xml import parse_xml
 
@@ -27,14 +29,14 @@ def matrix_to_nglview(m):
     nglv_matrix[:3,:3] = np.dot(m, np.array([[-1,0,0],[0,1,0],[0,0,-1]]))
     return list(nglv_matrix.flatten())
 
-def group_by(obj, attr):
+def group_by(l, key):
     d = dict()
-    for o in obj:
-        a = o.get(attr, None)
-        if a in d:
-            d[a].append(o)
+    for i in l:
+        k = key(i)
+        if k in d:
+            d[k].append(i)
         else:
-            d[a] = [o]
+            d[k] = [i]
     return d
 
 def not_none(x):
@@ -91,7 +93,8 @@ def shades_from_rgb(color, w=0.3):
     return LinearSegmentedColormap.from_list("shade", colors)
 
 def get_sequential_colors(colors='Set1', n=1):
-    # see uses matplotlib.colors.ColorMap
+    # sample n colors from a colormap
+    # uses matplotlib.colors.ColorMap.N to distinguish continuous/discrete
     cmap = cm.get_cmap(colors)
     if cmap.N == 256:
         # continuous color map
@@ -136,7 +139,12 @@ class Cartoon:
         self.outline_by = None
 
         # load structure with biopython
-        parser = PDBParser()
+        if file[-3:] in ["cif", "mcif"]:
+            parser = MMCIFParser()
+        elif file[-3:] in ["pdb", "ent"]:
+            parser = PDBParser()
+        else:
+            sys.exit("File format not recognized!")
         self.structure = parser.get_structure(file, file)[model]
         _all_chains = [c.id for c in self.structure.get_chains()]
 
@@ -220,9 +228,16 @@ class Cartoon:
     def _set_nglview_orientation(self, m):
         # m is 3x3 rotation matrix
         if self.use_nglview:
-            nglv_matrix = matrix_to_nglview(self.view_matrix)
+            nglv_matrix = matrix_to_nglview(m)
+            #print("Before", self.view._camera_orientation)
             self.view._set_camera_orientation(nglv_matrix)
+            # having a bug where setting camera orientation does nothing
+            # waiting a little bit seems to fix it (maybe an issue with sync/refresh)
+            #self.view.control.orient(nglv_matrix)
+            #self.view._camera_orientation = nglv_matrix
+            time.sleep(0.1)
             self.view.center()
+            #print("After", self.view._camera_orientation)
 
     def load_pymol_view(self, file):
         # read rotation matrix from PyMol get_view command
@@ -237,6 +252,9 @@ class Cartoon:
         # rotate camera in nglview
         self._set_nglview_orientation(self.view_matrix)
 
+    def test(self):
+        print(self.view._camera_orientation)
+
     def save_view_matrix(self, p):
         self._update_view_matrix()
         np.savetxt(p, self.view_matrix)
@@ -245,13 +263,17 @@ class Cartoon:
         self.view_matrix = np.loadtxt(p)
         self._set_nglview_orientation(self.view_matrix)
 
-    def outline(self, by="all", color=None, occlude=True, only_annotated=False):
+    def outline(self, by="all", color=None, occlude=True, only_annotated=False, radius=1.5):
 
         # collapse chain hierarchy into flat list
         self.residues_flat = [self.residues[c][i] for c in self.residues for i in self.residues[c]]
 
+        #print("Before", self.view._camera_orientation)
+        #print("Before2", self.view_matrix)
         if self.use_nglview:
             self._update_view_matrix()
+        #print("After", self.view._camera_orientation)
+        #print("After2", self.view_matrix)
 
         # transform atomic coordinates using view matrix
         self.rotated_coord = np.dot(self.coord, self.view_matrix)
@@ -265,34 +287,34 @@ class Cartoon:
 
         if by == 'all':
             # space-filling outline of entire molecule
-            self._polygon = so.unary_union([sg.Point(i).buffer(1.5) for i in self.rotated_coord[:,:2]])
-            self._polygons.append(self._polygon)
+            self._polygon = so.unary_union([sg.Point(i).buffer(radius) for i in self.rotated_coord[:,:2]])
+            self._polygons.append(({}, self._polygon))
 
         elif by == 'residue':
-            z_sorted_residues = sorted(self.residues_flat, key=lambda res: np.mean(self.rotated_coord[range(*res['coord'])]))
-
-            for res in z_sorted_residues:
+            for res in self.residues_flat:
                 # pick range of atomic coordinates out of main data structure
-                coords = self.rotated_coord[range(*res['coord'])]
-                group_outline = so.cascaded_union([sg.Point(i).buffer(1.5) for i in coords])
-                self._polygons.append(group_outline)
+                res_coords = np.array(self.rotated_coord[range(*res['coord'])])
+                group_outline = so.cascaded_union([sg.Point(i).buffer(radius) for i in res_coords])
+                res["xyz"] = res_coords
+                res["polygon"] = group_outline
+                self._polygons.append((res, group_outline))
 
         elif by in ['domain', 'topology', 'chain']:
 
             if by in ['domain', 'topology']:
                 assert(self._uniprot_xml is not None)
 
-            residue_groups = group_by(self.residues_flat, by)
+            residue_groups = group_by(self.residues_flat, key=lambda x: x[by])
             if occlude:
                 region_polygons = {c:[] for c in sorted(residue_groups.keys(), key=not_none)}
                 view_object = None
                 for res in reversed(self.residues_flat):
                     coords = self.rotated_coord[range(*res['coord'])]
                     if not only_annotated or res.get(by) is not None:
-                        space_filling = sg.Point(coords[0]).buffer(1.5)
+                        space_filling = sg.Point(coords[0]).buffer(radius)
                         for i in coords:
-                            #space_filling = space_filling.union(sg.Point(i).buffer(1.5))
-                            space_filling = safe_union(space_filling, sg.Point(i).buffer(1.5))
+                            #space_filling = space_filling.union(sg.Point(i).buffer(radius))
+                            space_filling = safe_union(space_filling, sg.Point(i).buffer(radius))
                         #space_filling = so.cascaded_union([sg.Point(i*10+np.random.random(3)).buffer(15) for i in coords])
                         if not view_object:
                             view_object = space_filling
@@ -310,23 +332,30 @@ class Cartoon:
 
                 for i, (region_name, region_polygon) in enumerate(region_polygons.items()):
                     if not only_annotated or region_name is not None:
-                        self._polygons.append(safe_union_accumulate(region_polygon))
+                        self._polygons.append(({by:region_name}, safe_union_accumulate(region_polygon)))
             else:
-                residue_groups = group_by(self.residues_flat, by)
+                residue_groups = group_by(self.residues_flat, key=lambda x: x[by])
                 for group_i, (group_name, group_res) in enumerate(sorted(residue_groups.items(), key=not_none)):
                     if not only_annotated or group_name is not None:
                         group_coords = np.concatenate([self.rotated_coord[range(*r['coord'])] for r in group_res])
-                        self._polygons.append(safe_union_accumulate([sg.Point(i).buffer(1.5) for i in group_coords]))
+                        self._polygons.append(({by:region_name}, safe_union_accumulate([sg.Point(i).buffer(radius) for i in group_coords])))
 
         self.outline_by = by
         print("Outlined some atoms!", file=sys.stderr)
 
-    def plot(self, axes_labels=False, colors=None, smoothing=False, do_show=True, axes=None, save=None, dpi=300, format="pdf"):
+    def plot(self, axes_labels=False, colors=None, color_residues_by=None, shading=True, smoothing=False, do_show=True, axes=None, save=None, dpi=300, format="pdf"):
         """
         mirroring biopython's phylogeny drawing options
         https://biopython.org/DIST/docs/api/Bio.Phylo._utils-module.html
         can optionally pass a matplotlib Axes instance instead of creating a new one
         if do_show is false then return axes object
+
+        colors -- color scheme for plotting acceptable arguments are
+            - named matplotlib-compatible color e.g. "red" (string)
+            - hexadecimal color e.g. "#F8F8FF" (string)
+            - list/tuple of colors e.g. ["red", "#F8F8FF"] (list/tuple)
+            - dict of names to colors e.g. {"domain A": "red", "domain B":"blue"} (dict)
+            - named discrete or continuous color scheme e.g. "Set1" (string)
         """
 
         if axes is None:
@@ -350,11 +379,21 @@ class Cartoon:
             axs = axes
         self._axes= axs
 
-        # this should all be cleaned up, add more checking
-        num_colors_needed = len(self._polygons)
+        # TODO this should all be cleaned up, add more checking
         # TODO What if you're repeating colors (e.g. same domains)
-        default_color = 'dodgerblue'
+        if self.outline_by == "residue":
+            if color_residues_by is None:
+                num_colors_needed = 1
+                residue_color_groups = {"all":self.residues_flat}
+            else:
+                residue_color_groups = group_by(self.residues_flat, lambda x: x.get(color_residues_by))
+                num_colors_needed = len(residue_color_groups)
+        else:
+            num_colors_needed = len(self._polygons)
+
+        default_color = 'lightgray'
         default_cmap = 'Set1'
+        named_colors = [*mcolors.BASE_COLORS.keys(), *mcolors.TABLEAU_COLORS.keys(), *mcolors.CSS4_COLORS.keys(), *mcolors.XKCD_COLORS.keys()]
 
         if colors is None:
             if num_colors_needed == 1:
@@ -362,33 +401,48 @@ class Cartoon:
             else:
                 sequential_colors = get_sequential_colors(colors=default_cmap, n=num_colors_needed)
         else:
-            if isinstance(colors, str):
-                if num_colors_needed == 1:
-                    sequential_colors = [colors]
-                else:
-                    sequential_colors = get_sequential_colors(colors=colors, n=num_colors_needed)
-            elif isinstance(colors, (list, tuple)):
-                if num_colors_needed == 1:
-                    sequential_colors = [colors[0]]
-                elif num_colors_needed == len(colors):
-                    sequential_colors = colors
-                else:
-                    if len(colors) > num_colors_needed:
-                        # TODO if too many colors, just take the needed ones
-                        pass
-                    elif len(colors) < num_colors_needed:
-                        # TODO if not enough colors, just repeat
-                        pass
-
-            elif isinstance(colors, dict):
-                pass
-
-        for i, p in enumerate(self._polygons):
-            if smoothing:
-                poly_to_draw = smooth_polygon(p, level=1)
+            if isinstance(colors, dict):
+                sequential_colors = []
             else:
-                poly_to_draw = p
-            plot_polygon(poly_to_draw, fc=sequential_colors[i], scale=1.0, axes=axs)
+                if isinstance(colors, str):
+                    if num_colors_needed == 1:
+                        sequential_colors = [colors]
+                    else:
+                        sequential_colors = get_sequential_colors(colors=colors, n=num_colors_needed)
+                elif isinstance(colors, (list, tuple)):
+                    if num_colors_needed == 1:
+                        sequential_colors = [colors[0]]
+                    elif num_colors_needed == len(colors):
+                        sequential_colors = colors
+
+        if len(sequential_colors) > 0:
+            color_map = {k:sequential_colors[i] for i,k in enumerate(residue_color_groups.keys())}
+
+        if self.outline_by == "residue":
+            # TODO clean this up
+            z_sorted_residues = sorted(self.residues_flat, key=lambda res: np.mean(res["xyz"][:,-1]))
+            for i, p in enumerate(z_sorted_residues):
+                if smoothing:
+                    poly_to_draw = smooth_polygon(p["polygon"], level=1)
+                else:
+                    poly_to_draw = p["polygon"]
+                color_value = p.get(color_residues_by)
+                if isinstance(colors, dict):
+                    fc = colors[color_value]
+                else:
+                    fc = color_map.get(color_value, default_color)
+
+                plot_polygon(poly_to_draw, fc=fc, scale=1.0, axes=axs)
+
+        else:
+            if isinstance(colors, dict):
+                sequential_colors = [colors[p[0][self.outline_by]] for p in self._polygons]
+            for i, p in enumerate(self._polygons):
+                if smoothing:
+                    poly_to_draw = smooth_polygon(p[1], level=1)
+                else:
+                    poly_to_draw = p[1]
+                plot_polygon(poly_to_draw, fc=sequential_colors[i], scale=1.0, axes=axs)
 
         if save is not None:
             plt.savefig("{}.{}".format(save, format), dpi=dpi, transparent=True, pad_inches=0, bbox_inches='tight')
@@ -427,8 +481,7 @@ class Cartoon:
 
 def make_cartoon(args):
     """
-    minimal functionality of pdb2svg.py
-    doesn't support all arguments
+    basic functionality of pdb2svg.py (doesn't support all arguments)
     """
 
     # accept list of chains for backwards-compatibility
@@ -439,6 +492,11 @@ def make_cartoon(args):
         chain = ''.join(args.chain)
 
     molecule = Cartoon(args.pdb, chain=chain, model=args.model, uniprot=args.uniprot, view=False)
-    molecule.load_pymol_view(args.view)
-    molecule.outline(args.outline_by, occlude=args.occlude)
-    molecule.plot(do_show=False, axes_labels=args.axes, dpi=args.dpi, save=args.save, format=args.format)
+    if args.view[-3:] == "npy":
+        molecule.load_view_matrix(args.view)
+    else:
+        molecule.load_pymol_view(args.view)
+    molecule.outline(args.outline_by, occlude=args.occlude, radius=args.radius)
+    if args.outline_by == "residue":
+        color_residues_by = args.color_by
+    molecule.plot(do_show=False, axes_labels=args.axes, color_residues_by=color_residues_by, dpi=args.dpi, save=args.save, format=args.format)

@@ -1,8 +1,7 @@
-# Tools for proteome visualization
-## pdb2svg: Vector outlines of macromolecular structure
+# CellScape: Protein structure visualization with vector graphics cartoons
 <img src="ig_example.png" alt="logo" width=700/>
 
-### Installation
+## Installation
 To run CellScape you will need:
 * Python 3
 * [PyMOL](https://pymol.org/2/) (optional)
@@ -16,11 +15,15 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-### Example: Immunogolobulin
-We can download an immunoglobulin structure from the PDB to test on:
-```
-curl -O https://files.rcsb.org/view/1IGT.pdb
-```
+## `cellscape cartoon`
+
+### Jupyter notebook interface
+An example notebook is provided [here](examples/cartoon.ipynb).
+
+### Command-line interface
+
+CellScape can also be run from the command-line.
+
 #### Selecting the camera view in PyMOL
 First open the protein structure in PyMOL, choose the desired rotation (zoom is irrelevant), and enter `get_view` in the PyMOL console. The output should look something like this:
 ```
@@ -36,21 +39,25 @@ set_view (\
 ```
 Copy and paste the indicated region into a new text file, `view.txt`. In the absence of this rotation matrix, the program will attempt to align the view along the N-C axis of the protein. While this works acceptably for long, linear proteins (e.g. CEACAM5) for this example we'll want to specify the view beforehand.
 
-#### Generating graphics from the command-line
+#### Generating molecular outlines
 The following examples should yield the three images used in the top figure (from left to right):
 ```
-cellscape cartoon --pdb 1IGT.pdb --view view.txt --outline residue --color_by chain
+cellscape cartoon --pdb examples/ig/1igt.pdb --view examples/ig/view.txt --outline residue --color_by chain
 ```
 The most realistic visualization projects the 3D coordinates down to two dimensions, and outlines each residue separately. Shading is used to simulate depth in a style inspired by [David Goodsell](https://pdb101.rcsb.org/motm/21).
 
 ```
-cellscape cartoon --pdb 1IGT.pdb --view view.txt --outline chain --occlude
+cellscape cartoon --pdb examples/ig/1igt.pdb --view examples/ig/view.txt --outline chain --occlude
 ```
 Each chain is outlined separately. The `--occlude` flag ensures that if the chains overlap, only the portion that is visible (i.e. closer to the camera) is incorporated into the outline.
 
 ```
-cellscape cartoon --pdb 1IGT.pdb --view view.txt --outline all
+cellscape cartoon --pdb examples/ig/1igt.pdb --view examples/ig/view.txt --outline all
 ```
 A simple space-filling outline of the entire structure.
 
 Full description of all options is available by running `cellscape cartoon -h`.
+
+## `cellscape scene`
+
+Full description of all options is available by running `cellscape scene -h`.
