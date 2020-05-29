@@ -336,7 +336,7 @@ class Cartoon:
         self.outline_by = by
         print("Outlined some atoms!", file=sys.stderr)
 
-    def plot(self, axes_labels=False, colors=None, color_residues_by=None, shading=False, shading_range=0.6, smoothing=False, do_show=True, axes=None, save=None, dpi=300):
+    def plot(self, axes_labels=False, colors=None, color_residues_by=None, edge_color="black", line_width=0.7, shading=False, shading_range=0.6, smoothing=False, do_show=True, axes=None, save=None, dpi=300):
         """
         mirroring biopython's phylogeny drawing options
         https://biopython.org/DIST/docs/api/Bio.Phylo._utils-module.html
@@ -435,7 +435,7 @@ class Cartoon:
                 if shading:
                     fc = shade_from_color(fc, rescale_coord(np.mean(p["xyz"][:,2])), range=shading_range)
 
-                plot_polygon(poly_to_draw, fc=fc, scale=1.0, axes=axs)
+                plot_polygon(poly_to_draw, fc=fc, scale=1.0, axes=axs, ec=edge_color, linewidth=line_width)
 
         else:
             if isinstance(colors, dict):
@@ -445,7 +445,7 @@ class Cartoon:
                     poly_to_draw = smooth_polygon(p[1], level=1)
                 else:
                     poly_to_draw = p[1]
-                plot_polygon(poly_to_draw, fc=sequential_colors[i], scale=1.0, axes=axs)
+                plot_polygon(poly_to_draw, fc=sequential_colors[i], scale=1.0, axes=axs, ec=edge_color, linewidth=line_width)
 
         if save is not None:
             plt.savefig(save, dpi=dpi, transparent=True, pad_inches=0, bbox_inches='tight')
@@ -505,8 +505,13 @@ def make_cartoon(args):
         molecule.load_view_matrix(args.view)
 
     molecule.outline(args.outline_by, occlude=args.occlude, radius=args.radius)
-    if args.outline_by == "residue":
+    if args.outline_by == "residue" and args.color_by != "same":
         color_residues_by = args.color_by
     else:
         color_residues_by = None
-    molecule.plot(do_show=False, axes_labels=args.axes, color_residues_by=color_residues_by, dpi=args.dpi, save="{}.{}".format(args.save, args.format), shading=True)
+
+    if len(args.colors) > 0:
+        colors = args.colors
+    else:
+        colors = None
+    molecule.plot(do_show=False, axes_labels=args.axes, colors=colors, color_residues_by=color_residues_by, dpi=args.dpi, save="{}.{}".format(args.save, args.format), shading=True, edge_color=args.edge_color, line_width=args.line_width)

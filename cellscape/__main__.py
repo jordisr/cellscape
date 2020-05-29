@@ -30,10 +30,9 @@ def main():
     parser_cartoon.add_argument('--occlude', action='store_true', default=False, help='Occlude residues that are not visible and draw outlines using visible residues only')
     parser_cartoon.add_argument('--radius', default=1.5, help='Atomic radius, in angstroms', type=float)
     parser_cartoon.add_argument('--axes', action='store_true', default=False, help='Draw x and y axes around molecule')
-    #parser_cartoon.add_argument('--c', default=['#D3D3D3'], nargs='+', help='Set default color(s) in hex RGB')
-    #parser_cartoon.add_argument('--cmap', default='Set1', help='Set default color map')
-    #parser_cartoon.add_argument('--ec', default='k', help='Set default edge color')
-    #parser_cartoon.add_argument('--linewidth', default=0.7, type=float, help='Set default line width')
+    parser_cartoon.add_argument('--colors', default=[], nargs='+', help='Specify color scheme for protein (list of colors or matplotlib color map)')
+    parser_cartoon.add_argument('--edge_color', default='black', help='Edge color')
+    parser_cartoon.add_argument('--line_width', default=0.7, type=float, help='Line width')
 
     # scene (formerly compose_scene.py)
     parser_scene = subparsers.add_parser('scene', help='', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
