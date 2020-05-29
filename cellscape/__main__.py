@@ -15,7 +15,7 @@ def main():
     parser_cartoon.add_argument('--pdb', help='Protein coordinates file (.pdb/.ent/.cif/.mcif)', required=True)
     parser_cartoon.add_argument('--model', type=int, default=0, help='Model number in PDB to load')
     parser_cartoon.add_argument('--chain', default=['all'], help='Chain(s) in structure to outline', nargs='+')
-    parser_cartoon.add_argument('--view', help='Output from PyMol get_view')
+    parser_cartoon.add_argument('--view', help='Camera rotation matrix or output from PyMol get_view command')
     parser_cartoon.add_argument('--uniprot', nargs='+', help='UniProt XML file to parse for sequence/domain/topology information')
     parser_cartoon.add_argument('--save', default='out', help='Prefix to save graphics')
     parser_cartoon.add_argument('--format', default='svg', help='Format to save graphics', choices=['svg','pdf','png','ps'])

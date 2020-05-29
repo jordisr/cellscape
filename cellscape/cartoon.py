@@ -495,8 +495,18 @@ def make_cartoon(args):
         chain = ''.join(args.chain)
 
     molecule = Cartoon(args.pdb, chain=chain, model=args.model, uniprot=args.uniprot, view=False)
-    molecule.load_pymol_view(args.view)
+
+    # open first line to identify view file
+    with open(args.view) as view_f:
+        first_line = view_f.readline()
+    if first_line[:8] == 'set_view':
+        molecule.load_pymol_view(args.view)
+    else:
+        molecule.load_view_matrix(args.view)
+
     molecule.outline(args.outline_by, occlude=args.occlude, radius=args.radius)
     if args.outline_by == "residue":
         color_residues_by = args.color_by
+    else:
+        color_residues_by = None
     molecule.plot(do_show=False, axes_labels=args.axes, color_residues_by=color_residues_by, dpi=args.dpi, save="{}.{}".format(args.save, args.format), shading=True)
