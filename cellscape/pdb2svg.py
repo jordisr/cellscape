@@ -441,7 +441,12 @@ if __name__ == '__main__':
                 cmap_list = get_sequential_cmap(number_groups)
                 cmap_colors = len(cmap_list)
                 color_dict = {}
-                for i, k in enumerate(sorted(residue_groups.keys(), key=not_none)):
+                if args.color_by == 'chain': # preserve order chains were given in
+                    color_groups = chain_list
+                else:
+                    color_groups = list(map(not_none, residue_groups.keys()))
+                print(color_groups)
+                for i, k in enumerate(color_groups):
                     color_dict[k] = cmap_list[i % cmap_colors]
             else:
                 cmap = hex_to_cmap(args.c[0])
@@ -477,7 +482,7 @@ if __name__ == '__main__':
         elif args.outline_by in ['domain', 'topology', 'chain']:
             residue_groups = group_by(res_data, args.outline_by)
             if args.occlude:
-                region_polygons = {c:[] for c in sorted(residue_groups.keys(), key=not_none)}
+                region_polygons = {c:[] for c in list(map(not_none, residue_groups.keys()))}
                 view_object = None
                 for res in reversed(res_data):
                     coords = res.xyz
