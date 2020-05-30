@@ -61,12 +61,15 @@ def safe_union_accumulate(polys):
     # union of list of shapely polygons
     # maybe slower than cascaded_union/unary_union but catches topology errors
     # TODO figure out a better way of handling these exceptions
+    exception_counter = 0
     u = polys[0]
     for p in polys:
         try:
             u = u.union(p)
         except:
+            exception_counter += 1
             pass
+    #print("UNION ACCUMULATE CAUGHT {} EXCEPTION(S)!!".format(exception_counter))
     return u
 
 def safe_union(a, b):
@@ -319,8 +322,15 @@ class Cartoon:
                             elif view_object.contains(space_filling):
                                 pass
                             else:
-                                region_polygons[res.get(by)].append(space_filling.difference(view_object))
-                                #view_object = view_object.union(space_filling)
+                                # BUG source of TopologyExceptions when accumulating outlines
+                                # putting in a threshold for taking the difference seems to work ok
+                                #   in one case but I haven't widely tested it
+                                difference = space_filling.difference(view_object)
+                                if difference.area > 10:
+                                    region_polygons[res.get(by)].append(difference)
+                                else:
+                                    region_polygons[res.get(by)].append(space_filling)
+
                                 view_object = safe_union(view_object, space_filling)
 
                 for i, (region_name, region_polygon) in enumerate(region_polygons.items()):
@@ -331,7 +341,7 @@ class Cartoon:
                 for group_i, (group_name, group_res) in enumerate(sorted(residue_groups.items(), key=not_none)):
                     if not only_annotated or group_name is not None:
                         group_coords = np.concatenate([self.rotated_coord[range(*r['coord'])] for r in group_res])
-                        self._polygons.append(({by:region_name}, safe_union_accumulate([sg.Point(i).buffer(radius) for i in group_coords])))
+                        self._polygons.append(({by:group_name}, safe_union_accumulate([sg.Point(i).buffer(radius) for i in group_coords])))
 
         self.outline_by = by
         print("Outlined some atoms!", file=sys.stderr)
