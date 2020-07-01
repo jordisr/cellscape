@@ -248,8 +248,18 @@ class Cartoon:
         # rotate camera in nglview
         self._set_nglview_orientation(self.view_matrix)
 
-    def test(self):
-        print(self.view._camera_orientation)
+    def load_chimera_view(self, file):
+        # read rotation matrix from Chimera matrixget command
+        matrix = []
+        with open(file,'r') as view:
+            for line in view.readlines()[1:4]:
+                matrix.append(line.split())
+
+        # transpose and remove translation vector
+        self.view_matrix = np.array(matrix).astype(float).T[:3]
+
+        # rotate camera in nglview
+        self._set_nglview_orientation(self.view_matrix)
 
     def save_view_matrix(self, p):
         self._update_view_matrix()
@@ -511,6 +521,8 @@ def make_cartoon(args):
         first_line = view_f.readline()
     if first_line[:8] == 'set_view':
         molecule.load_pymol_view(args.view)
+    elif first_line[:5] == 'Model':
+        molecule.load_chimera_view(args.view)
     else:
         molecule.load_view_matrix(args.view)
 
