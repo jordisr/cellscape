@@ -111,7 +111,7 @@ def smooth_polygon(p, level=0):
     else:
         return p
 
-def plot_polygon(poly, fc='orange', ec='k', linewidth=0.7, scale=1.0, axes=None):
+def plot_polygon(poly, fc='orange', ec='k', linewidth=0.7, scale=1.0, axes=None, zorder_mod=0):
     if axes is None:
         axs = plt.gca()
     else:
@@ -119,14 +119,14 @@ def plot_polygon(poly, fc='orange', ec='k', linewidth=0.7, scale=1.0, axes=None)
     axs.set_aspect('equal')
     if isinstance(poly, sg.polygon.Polygon):
         xs, ys = poly.exterior.xy
-        axs.fill(np.array(xs)/scale, np.array(ys)/scale, alpha=1, fc=fc, ec=ec, linewidth=linewidth, zorder=3)
+        axs.fill(np.array(xs)/scale, np.array(ys)/scale, alpha=1, fc=fc, ec=ec, linewidth=linewidth, zorder=3+zorder_mod)
     elif isinstance(poly, sg.multipolygon.MultiPolygon):
         for p in poly:
             xs, ys = p.exterior.xy
-            axs.fill(np.array(xs)/scale, np.array(ys)/scale, alpha=1, fc=fc, ec=ec, linewidth=linewidth, zorder=3)
+            axs.fill(np.array(xs)/scale, np.array(ys)/scale, alpha=1, fc=fc, ec=ec, linewidth=linewidth, zorder=3+zorder_mod)
     elif isinstance(poly, (tuple, list)):
         xs, ys = poly
-        axs.fill(np.array(xs)/scale, np.array(ys)/scale, alpha=1, fc=fc, ec=ec, linewidth=linewidth, zorder=3)
+        axs.fill(np.array(xs)/scale, np.array(ys)/scale, alpha=1, fc=fc, ec=ec, linewidth=linewidth, zorder=3+zorder_mod)
 
 class Cartoon:
     def __init__(self, file, model=0, chain="all", uniprot=None, view=True):
@@ -160,7 +160,13 @@ class Cartoon:
             if 'nglview' not in sys.modules or 'nv' not in sys.modules:
                 import nglview as nv
             self._structure_to_view = self.structure
-            self.view = nv.show_biopython(self._structure_to_view, sync_camera=True)
+            initial_repr = [
+                {"type": "spacefill", "params": {
+                    "sele": "protein", "color": "skyblue"
+                }}
+            ]
+            self.view = nv.show_biopython(self._structure_to_view, sync_camera=True, representations=initial_repr)
+            self.view.camera = 'orthographic'
             self.view._set_sync_camera([self.view])
             self._reflect_y = np.array([[-1,0,0],[0,1,0],[0,0,-1]])
 
@@ -269,7 +275,7 @@ class Cartoon:
         self.view_matrix = np.loadtxt(p)
         self._set_nglview_orientation(self.view_matrix)
 
-    def outline(self, by="all", color=None, occlude=True, only_annotated=False, radius=1.5):
+    def outline(self, by="all", color=None, occlude=False, only_annotated=False, radius=1.5):
 
         # collapse chain hierarchy into flat list
         self.residues_flat = [self.residues[c][i] for c in self.residues for i in self.residues[c]]
@@ -295,13 +301,15 @@ class Cartoon:
             # space-filling outline of entire molecule
             self._polygon = so.unary_union([sg.Point(i).buffer(radius) for i in self.rotated_coord[:,:2]])
             self._polygons.append(({}, self._polygon))
-
-        elif by == 'residue':
+        else:
             for res in self.residues_flat:
                 # pick range of atomic coordinates out of main data structure
                 res_coords = np.array(self.rotated_coord[range(*res['coord'])])
-                group_outline = so.cascaded_union([sg.Point(i).buffer(radius) for i in res_coords])
                 res["xyz"] = res_coords
+
+        if by == 'residue':
+            for res in self.residues_flat:
+                group_outline = so.cascaded_union([sg.Point(i).buffer(radius) for i in res["xyz"] ])
                 res["polygon"] = group_outline
                 self._polygons.append((res, group_outline))
 
@@ -314,7 +322,7 @@ class Cartoon:
             if occlude:
                 region_polygons = {c:[] for c in sorted(residue_groups.keys(), key=not_none)}
                 view_object = None
-                for res in reversed(self.residues_flat):
+                for res in sorted(self.residues_flat, key=lambda res: np.mean(res["xyz"][:,-1]), reverse=True):
                     coords = self.rotated_coord[range(*res['coord'])]
                     if not only_annotated or res.get(by) is not None:
                         space_filling = sg.Point(coords[0]).buffer(radius)
@@ -322,36 +330,39 @@ class Cartoon:
                             #space_filling = space_filling.union(sg.Point(i).buffer(radius))
                             space_filling = safe_union(space_filling, sg.Point(i).buffer(radius))
                         #space_filling = so.cascaded_union([sg.Point(i*10+np.random.random(3)).buffer(15) for i in coords])
+
                         if not view_object:
+                            # initialize if unassigned
                             view_object = space_filling
                         else:
                             if view_object.disjoint(space_filling):
-                                #view_object = view_object.union(space_filling)
+                                # residue doesn't overlap with view so add it to the view
                                 view_object = safe_union(view_object, space_filling)
                                 region_polygons[res.get(by)].append(space_filling)
+
                             elif view_object.contains(space_filling):
+                                # residue completely covered and not visible
                                 pass
                             else:
+                                # residue partially occluded
+                                #   don't want small holes from other entries
                                 # BUG source of TopologyExceptions when accumulating outlines
                                 # putting in a threshold for taking the difference seems to work ok
                                 #   in one case but I haven't widely tested it
                                 difference = space_filling.difference(view_object)
-                                if difference.area > 10:
-                                    region_polygons[res.get(by)].append(difference)
-                                else:
-                                    region_polygons[res.get(by)].append(space_filling)
-
+                                #if difference.area > 5:
+                                region_polygons[res.get(by)].append(difference.buffer(0.1))
                                 view_object = safe_union(view_object, space_filling)
 
                 for i, (region_name, region_polygon) in enumerate(region_polygons.items()):
                     if not only_annotated or region_name is not None:
-                        self._polygons.append(({by:region_name}, safe_union_accumulate(region_polygon)))
+                        self._polygons.append(({by:region_name}, so.unary_union(region_polygon)))
             else:
                 residue_groups = group_by(self.residues_flat, key=lambda x: x[by])
                 for group_i, (group_name, group_res) in enumerate(sorted(residue_groups.items(), key=not_none)):
                     if not only_annotated or group_name is not None:
                         group_coords = np.concatenate([self.rotated_coord[range(*r['coord'])] for r in group_res])
-                        self._polygons.append(({by:group_name}, safe_union_accumulate([sg.Point(i).buffer(radius) for i in group_coords])))
+                        self._polygons.append(({by:group_name}, so.unary_union([sg.Point(i).buffer(radius) for i in group_coords])))
 
         self.outline_by = by
         print("Outlined some atoms!", file=sys.stderr)
