@@ -173,22 +173,29 @@ class Cartoon:
         # data structure holding residue information
         self.residues = dict()
         self.coord = []
-        i = 0
+        self.ca_atoms = []
+        all_atoms = 0
         for chain in self.chains:
             self.residues[chain] = dict()
             for res in self.structure[chain]:
                 res_id = res.get_full_id()[3][1]
-                xyz = [list(a.get_vector()) for a in res] # leaving in for testing
-                for coord in xyz:
-                    self.coord.append(coord)
-                    i += 1
+                residue_atoms = 0
+                for a in res:
+                    self.coord.append(list(a.get_vector()))
+                    if a.id == "CA":
+                        this_ca_atom = all_atoms
+                        self.ca_atoms.append(this_ca_atom)
+                    all_atoms += 1
+                    residue_atoms += 1
                 self.residues[chain][res_id] = {
                 'chain':chain,
                 'id':res_id,
                 'object':res,
-                'coord':(i-len(xyz),i)
+                'coord':(all_atoms-residue_atoms, all_atoms),
+                'coord_ca':(this_ca_atom, this_ca_atom+1)
                 }
         self.coord = np.array(self.coord)
+        self.ca_atoms = np.array(self.ca_atoms).astype(int)
 
         # uniprot information
         self._uniprot_xml = uniprot
@@ -275,7 +282,7 @@ class Cartoon:
         self.view_matrix = np.loadtxt(p)
         self._set_nglview_orientation(self.view_matrix)
 
-    def outline(self, by="all", color=None, occlude=False, only_annotated=False, radius=1.5):
+    def outline(self, by="all", color=None, occlude=False, only_ca=False, only_annotated=False, radius=None):
 
         # collapse chain hierarchy into flat list
         self.residues_flat = [self.residues[c][i] for c in self.residues for i in self.residues[c]]
@@ -297,19 +304,31 @@ class Cartoon:
 
         self._polygons = []
 
+        # default radius for rendering atoms
+        if only_ca and radius is None:
+            radius_ = 5
+        else:
+            radius_ = 1.5
+
         if by == 'all':
             # space-filling outline of entire molecule
-            self._polygon = so.unary_union([sg.Point(i).buffer(radius) for i in self.rotated_coord[:,:2]])
+            if only_ca:
+                self._polygon = so.unary_union([sg.Point(i).buffer(radius_) for i in self.rotated_coord[self.ca_atoms,:2]])
+            else:
+                self._polygon = so.unary_union([sg.Point(i).buffer(radius_) for i in self.rotated_coord[:,:2]])
             self._polygons.append(({}, self._polygon))
         else:
             for res in self.residues_flat:
                 # pick range of atomic coordinates out of main data structure
-                res_coords = np.array(self.rotated_coord[range(*res['coord'])])
+                if only_ca:
+                    res_coords = np.array(self.rotated_coord[range(*res['coord_ca'])])
+                else:
+                    res_coords = np.array(self.rotated_coord[range(*res['coord'])])
                 res["xyz"] = res_coords
 
         if by == 'residue':
             for res in self.residues_flat:
-                group_outline = so.cascaded_union([sg.Point(i).buffer(radius) for i in res["xyz"] ])
+                group_outline = so.cascaded_union([sg.Point(i).buffer(radius_) for i in res["xyz"] ])
                 res["polygon"] = group_outline
                 self._polygons.append((res, group_outline))
 
@@ -323,12 +342,12 @@ class Cartoon:
                 region_polygons = {c:[] for c in sorted(residue_groups.keys(), key=not_none)}
                 view_object = None
                 for res in sorted(self.residues_flat, key=lambda res: np.mean(res["xyz"][:,-1]), reverse=True):
-                    coords = self.rotated_coord[range(*res['coord'])]
+                    coords = res["xyz"]
                     if not only_annotated or res.get(by) is not None:
-                        space_filling = sg.Point(coords[0]).buffer(radius)
+                        space_filling = sg.Point(coords[0]).buffer(radius_)
                         for i in coords:
-                            #space_filling = space_filling.union(sg.Point(i).buffer(radius))
-                            space_filling = safe_union(space_filling, sg.Point(i).buffer(radius))
+                            #space_filling = space_filling.union(sg.Point(i).buffer(radius_))
+                            space_filling = safe_union(space_filling, sg.Point(i).buffer(radius_))
                         #space_filling = so.cascaded_union([sg.Point(i*10+np.random.random(3)).buffer(15) for i in coords])
 
                         if not view_object:
@@ -362,7 +381,7 @@ class Cartoon:
                 for group_i, (group_name, group_res) in enumerate(sorted(residue_groups.items(), key=not_none)):
                     if not only_annotated or group_name is not None:
                         group_coords = np.concatenate([self.rotated_coord[range(*r['coord'])] for r in group_res])
-                        self._polygons.append(({by:group_name}, so.unary_union([sg.Point(i).buffer(radius) for i in group_coords])))
+                        self._polygons.append(({by:group_name}, so.unary_union([sg.Point(i).buffer(radius_) for i in group_coords])))
 
         self.outline_by = by
         print("Outlined some atoms!", file=sys.stderr)
