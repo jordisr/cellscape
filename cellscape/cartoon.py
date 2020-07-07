@@ -16,6 +16,7 @@ import colorsys
 import warnings
 from Bio.PDB import *
 from scipy import signal, interpolate
+from scipy.spatial.distance import pdist, squareform
 import time
 
 from .parse_uniprot_xml import parse_xml
@@ -234,6 +235,48 @@ class Cartoon:
         elif len(self.view_matrix) == 0:
             self.view_matrix = np.identity(3)
 
+    # TODO clean up this section
+    def align_view(self, v1, v2):
+        # rotate structure so v1 is aligned with v2
+        r = rotmat(vectors.Vector(v1), vectors.Vector(v2))
+        self.view_matrix = r.T
+        self._set_nglview_orientation(self.view_matrix)
+
+    def align_view_nc(self, n_atoms=10, c_atoms=10, flip=False):
+        # rotate structure so N-C vector is aligned with the vertical axis
+        com = np.mean(self.coord, axis=0)
+        atoms_ = self.coord - com
+        v1 = np.mean(atoms_[:n_atoms], axis=0) - np.mean(atoms_[-c_atoms:], axis=0)
+        if not flip:
+            self.align_view(v1, np.array([0,1,0]))
+        else:
+            self.align_view(v1, np.array([0,-1,0]))
+
+    def auto_view(self, n_atoms=100, c_atoms=100, flip=False):
+        # rotate structure so N-C vector is aligned with the vertical axis
+        com = np.mean(self.coord, axis=0)
+        atoms_ = self.coord - com
+        v1 = np.mean(atoms_[:n_atoms], axis=0) - np.mean(atoms_[-c_atoms:], axis=0)
+        if not flip:
+            first_rotation = rotmat(vectors.Vector(v1), vectors.Vector(np.array([0,1,0]))).T
+        else:
+            first_rotation = rotmat(vectors.Vector(v1), vectors.Vector(np.array([0,-1,0]))).T
+
+        # rotate around Y axis so X axis aligns with longest distance
+        rot_coord = np.dot(self.coord, first_rotation)
+        com = np.mean(rot_coord, axis=0)
+        atoms_ = rot_coord - com
+        xz = atoms_[self.ca_atoms][:,[0,2]]
+        dist = squareform(pdist(xz))
+        max_dist = np.unravel_index(np.argmax(dist, axis=None), dist.shape)
+        #print(max_dist, np.max(dist), dist[max_dist[0]][max_dist[1]])
+        v2 = atoms_[self.ca_atoms[max_dist[0]]]-atoms_[self.ca_atoms[max_dist[1]]]
+        v2[1] = 0
+        second_rotation = rotmat(vectors.Vector(v2), vectors.Vector(np.array([1,0,0]))).T
+
+        self.view_matrix = np.dot(first_rotation, second_rotation)
+        self._set_nglview_orientation(self.view_matrix)
+
     def _set_nglview_orientation(self, m):
         # m is 3x3 rotation matrix
         if self.use_nglview:
@@ -247,6 +290,10 @@ class Cartoon:
             time.sleep(0.1)
             self.view.center()
             #print("After", self.view._camera_orientation)
+
+    def _rotate_to_view(self):
+        # transform atomic coordinates using view matrix
+        self.rotated_coord = np.dot(self.coord, self.view_matrix)
 
     def load_pymol_view(self, file):
         # read rotation matrix from PyMol get_view command
@@ -295,7 +342,7 @@ class Cartoon:
         #print("After2", self.view_matrix)
 
         # transform atomic coordinates using view matrix
-        self.rotated_coord = np.dot(self.coord, self.view_matrix)
+        self._rotate_to_view
 
         # recenter coordinates on lower left edge of bounding box
         offset_x = np.min(self.rotated_coord[:,0])
