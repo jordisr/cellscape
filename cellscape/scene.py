@@ -204,17 +204,17 @@ def make_scene(args):
 
         # <-------------------------------------------------------------------------
         # testing new code
-        if args.membrane_interface and len(object_list) > 2:
-            skyline_pos = []
-            w=0
-            for i, o in enumerate(object_list):
-                skyline_pos.append([w,o['height']+np.random.rand()*10])
-                skyline_pos.append([w+o['width'],o['height']+np.random.rand()*10])
-                w += o['width'] + args.padding
-            skyline_pos = np.array(skyline_pos).T
-            membrane2 = membrane_cartoon(width=total_width, axes=axs, thickness=40, base_y=50)
-            membrane2.interpolate(skyline_pos[0], skyline_pos[1])
-            membrane2.draw(lipids=True)
+        #if args.membrane_interface and len(object_list) > 2:
+        #    skyline_pos = []
+        #    w=0
+        #    for i, o in enumerate(object_list):
+        #        skyline_pos.append([w,o['height']+np.random.rand()*10])
+        #        skyline_pos.append([w+o['width'],o['height']+np.random.rand()*10])
+        #        w += o['width'] + args.padding
+        #    skyline_pos = np.array(skyline_pos).T
+        #    membrane2 = membrane_cartoon(width=total_width, axes=axs, thickness=40, base_y=50)
+        #    membrane2.interpolate(skyline_pos[0], skyline_pos[1])
+        #    membrane2.draw(lipids=True)
         # <-------------------------------------------------------------------------
 
         if args.membrane == "flat":

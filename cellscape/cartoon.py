@@ -129,6 +129,39 @@ def plot_polygon(poly, fc='orange', ec='k', linewidth=0.7, scale=1.0, axes=None,
         xs, ys = poly
         axs.fill(np.array(xs)/scale, np.array(ys)/scale, alpha=1, fc=fc, ec=ec, linewidth=linewidth, zorder=3+zorder_mod)
 
+def orientation_from_topology(topologies):
+    # guess whether protein is N-C oriented based on UniProt topology annotation
+    first_ex_flag = True
+    first_ex = None
+    first_cy_flag = True
+    first_cy = None
+    first_he_flag = True
+    first_he = None
+
+    for row in topologies:
+        (description, start, end) = row
+
+        if description == 'Extracellular' and first_ex_flag:
+            first_ex = (start, end)
+            first_ex_flag = False
+        elif description == 'Helical' and first_he_flag:
+            first_he = (start, end)
+            first_he_flag = False
+        elif description == 'Cytoplasmic' and first_cy_flag:
+            first_cy = (start, end)
+            first_cy_flag = False
+
+    # rough heuristic for now
+    orient_from_topo = 1
+    if first_ex is not None and first_cy is not None:
+        if first_ex[0] > first_cy[0]:
+            orient_from_topo = 1
+        elif first_ex[0] < first_cy[0]:
+            orient_from_topo = -1
+
+    print("guessed orientation:{}".format(orient_from_topo))
+    return(orient_from_topo)
+
 class Cartoon:
     def __init__(self, file, model=0, chain="all", uniprot=None, view=True):
 
@@ -205,7 +238,7 @@ class Cartoon:
 
     def _preprocess_uniprot(self, xml):
         # TODO support more than one XML file (e.g. for differnet chains)
-        self._uniprot = parse_xml(xml[0])[0]
+        self._uniprot = parse_xml(xml)[0]
 
         # TODO add sequence alignment to find this automatically
         uniprot_chain = self.chains[0]
@@ -252,17 +285,23 @@ class Cartoon:
         else:
             self.align_view(v1, np.array([0,-1,0]))
 
-    def auto_view(self, n_atoms=100, c_atoms=100, flip=False):
+    def auto_view(self, n_atoms=100, c_atoms=100, flip=None):
+        if flip is None:
+            if self._uniprot_xml and hasattr(self._uniprot, "topology"):
+                nc_orient = orientation_from_topology(self._uniprot.topology)
+        elif nc_orient in [True, False]:
+            nc_orient = flip
+
         # rotate structure so N-C vector is aligned with the vertical axis
         com = np.mean(self.coord, axis=0)
         atoms_ = self.coord - com
         v1 = np.mean(atoms_[:n_atoms], axis=0) - np.mean(atoms_[-c_atoms:], axis=0)
-        if not flip:
+        if nc_orient:
             first_rotation = rotmat(vectors.Vector(v1), vectors.Vector(np.array([0,1,0]))).T
         else:
             first_rotation = rotmat(vectors.Vector(v1), vectors.Vector(np.array([0,-1,0]))).T
 
-        # rotate around Y axis so X axis aligns with longest distance
+        # rotate around Y axis so X axis aligns with longest distance in XZ plane
         rot_coord = np.dot(self.coord, first_rotation)
         com = np.mean(rot_coord, axis=0)
         atoms_ = rot_coord - com
@@ -291,7 +330,7 @@ class Cartoon:
             self.view.center()
             #print("After", self.view._camera_orientation)
 
-    def _rotate_to_view(self):
+    def _apply_view_matrix(self):
         # transform atomic coordinates using view matrix
         self.rotated_coord = np.dot(self.coord, self.view_matrix)
 
@@ -329,7 +368,7 @@ class Cartoon:
         self.view_matrix = np.loadtxt(p)
         self._set_nglview_orientation(self.view_matrix)
 
-    def outline(self, by="all", color=None, occlude=False, only_ca=False, only_annotated=False, radius=None):
+    def outline(self, by="all", color=None, occlude=False, only_ca=False, only_annotated=False, radius=None, back_outline=False):
 
         # collapse chain hierarchy into flat list
         self.residues_flat = [self.residues[c][i] for c in self.residues for i in self.residues[c]]
@@ -342,12 +381,24 @@ class Cartoon:
         #print("After2", self.view_matrix)
 
         # transform atomic coordinates using view matrix
-        self._rotate_to_view
+        self._apply_view_matrix()
 
         # recenter coordinates on lower left edge of bounding box
         offset_x = np.min(self.rotated_coord[:,0])
         offset_y = np.min(self.rotated_coord[:,1])
         self.rotated_coord -= np.array([offset_x, offset_y, 0])
+
+        # calculate vertical offset for transmembrane proteins
+        if self._uniprot_xml:
+            tm_coordinates = []
+            for res in self.residues_flat:
+                if res.get("topology","") == "Helical":
+                    tm_coordinates.append(np.array(self.rotated_coord[range(*res['coord_ca'])]))
+            if len(tm_coordinates) > 0:
+                tm_coordinates = np.concatenate(np.array(tm_coordinates))
+                tm_com_y = np.mean(tm_coordinates[:,1])
+                print("shifted for transmembrane region by {} angstroms".format(tm_com_y))
+                self.rotated_coord -= np.array([0, tm_com_y, 0])
 
         self._polygons = []
 
@@ -356,6 +407,15 @@ class Cartoon:
             radius_ = 5
         else:
             radius_ = 1.5
+
+        if back_outline:
+            # space-filling outline of entire molecule
+            if only_ca:
+                self._back_outline = so.unary_union([sg.Point(i).buffer(radius_) for i in self.rotated_coord[self.ca_atoms,:2]])
+            else:
+                self._back_outline = so.unary_union([sg.Point(i).buffer(radius_) for i in self.rotated_coord[:,:2]])
+        else:
+            self._back_outline = None
 
         if by == 'all':
             # space-filling outline of entire molecule
@@ -509,6 +569,9 @@ class Cartoon:
                         sequential_colors = [colors[0]]
                     elif num_colors_needed == len(colors):
                         sequential_colors = colors
+
+        if self._back_outline is not None:
+            plot_polygon(self._back_outline, fc="None", scale=1.0, axes=axs, ec=edge_color, linewidth=2, zorder_mod=-1)
 
         if self.outline_by == "residue":
             # TODO clean this section up
