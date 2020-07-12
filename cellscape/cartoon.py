@@ -3,7 +3,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.path import Path
 from matplotlib.patches import PathPatch
-from matplotlib import lines, text, cm
 import matplotlib.colors as mcolors
 from matplotlib.colors import LinearSegmentedColormap
 import shapely.geometry as sg
@@ -92,7 +91,7 @@ def shade_from_color(color, x, range):
 def get_sequential_colors(colors='Set1', n=1):
     # sample n colors from a colormap
     # uses matplotlib.colors.ColorMap.N to distinguish continuous/discrete
-    cmap = cm.get_cmap(colors)
+    cmap = matplotlib.cm.get_cmap(colors)
     if cmap.N == 256:
         # continuous color map
         sequential_colors = [cmap(x) for x in np.linspace(0.0,1.0, n)]
@@ -115,9 +114,9 @@ def smooth_polygon(p, level=0):
 def plot_polygon(poly, fc='orange', ec='k', linewidth=0.7, scale=1.0, axes=None, zorder_mod=0):
     if axes is None:
         axs = plt.gca()
+        axs.set_aspect('equal')
     else:
         axs = axes
-    axs.set_aspect('equal')
     if isinstance(poly, sg.polygon.Polygon):
         xs, ys = poly.exterior.xy
         axs.fill(np.array(xs)/scale, np.array(ys)/scale, alpha=1, fc=fc, ec=ec, linewidth=linewidth, zorder=3+zorder_mod)
@@ -196,7 +195,7 @@ class Cartoon:
             self._structure_to_view = self.structure
             initial_repr = [
                 {"type": "spacefill", "params": {
-                    "sele": "protein", "color": "skyblue"
+                    "sele": "protein", "color": "element"
                 }}
             ]
             self.view = nv.show_biopython(self._structure_to_view, sync_camera=True, representations=initial_repr)
@@ -213,9 +212,13 @@ class Cartoon:
             self.residues[chain] = dict()
             for res in self.structure[chain]:
                 res_id = res.get_full_id()[3][1]
+                if res.get_full_id()[3][0][0] == "H": # skip hetatm records
+                    continue
                 residue_atoms = 0
+                these_atoms = []
                 for a in res:
                     self.coord.append(list(a.get_vector()))
+                    these_atoms.append(a.id) # tracking atom identities for now
                     if a.id == "CA":
                         this_ca_atom = all_atoms
                         self.ca_atoms.append(this_ca_atom)
@@ -226,7 +229,8 @@ class Cartoon:
                 'id':res_id,
                 'object':res,
                 'coord':(all_atoms-residue_atoms, all_atoms),
-                'coord_ca':(this_ca_atom, this_ca_atom+1)
+                'coord_ca':(this_ca_atom, this_ca_atom+1),
+                'atoms':np.array(these_atoms)
                 }
         self.coord = np.array(self.coord)
         self.ca_atoms = np.array(self.ca_atoms).astype(int)
@@ -444,7 +448,7 @@ class Cartoon:
             if by in ['domain', 'topology']:
                 assert(self._uniprot_xml is not None)
 
-            residue_groups = group_by(self.residues_flat, key=lambda x: x[by])
+            residue_groups = group_by(self.residues_flat, key=lambda x: x.get(by))
             if occlude:
                 region_polygons = {c:[] for c in sorted(residue_groups.keys(), key=not_none)}
                 view_object = None
@@ -482,11 +486,13 @@ class Cartoon:
 
                 for i, (region_name, region_polygon) in enumerate(region_polygons.items()):
                     if not only_annotated or region_name is not None:
+                        print(i)
                         self._polygons.append(({by:region_name}, so.unary_union(region_polygon)))
             else:
-                residue_groups = group_by(self.residues_flat, key=lambda x: x[by])
+                residue_groups = group_by(self.residues_flat, key=lambda x: x.get(by))
                 for group_i, (group_name, group_res) in enumerate(sorted(residue_groups.items(), key=not_none)):
                     if not only_annotated or group_name is not None:
+                        print(group_name)
                         group_coords = np.concatenate([self.rotated_coord[range(*r['coord'])] for r in group_res])
                         self._polygons.append(({by:group_name}, so.unary_union([sg.Point(i).buffer(radius_) for i in group_coords])))
 
@@ -666,7 +672,7 @@ def make_cartoon(args):
     else:
         molecule.load_view_matrix(args.view)
 
-    molecule.outline(args.outline_by, occlude=args.occlude, radius=args.radius)
+    molecule.outline(args.outline_by, occlude=args.occlude, radius=args.radius, only_annotated=args.only_annotated)
     if args.outline_by == "residue" and args.color_by != "same":
         color_residues_by = args.color_by
     else:
