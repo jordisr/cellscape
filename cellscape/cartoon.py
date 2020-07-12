@@ -111,6 +111,33 @@ def smooth_polygon(p, level=0):
     else:
         return p
 
+def ring_coding(ob):
+    # https://sgillies.net/2010/04/06/painting-punctured-polygons-with-matplotlib.html
+    # The codes will be all "LINETO" commands, except for "MOVETO"s at the
+    # beginning of each subpath
+    n = len(ob.coords)
+    codes = np.ones(n, dtype=Path.code_type) * Path.LINETO
+    codes[0] = Path.MOVETO
+    return codes
+
+def polygon_to_path(polygon, cutoff=15, scale=1.0, offset=[0,0]):
+    # generate matplotlib Path object from Shapely polygon
+    # filter out small interior holes and apply a scaling factor if desired
+    #
+    # https://sgillies.net/2010/04/06/painting-punctured-polygons-with-matplotlib.html
+    # Convert coordinates to path vertices. Objects produced by Shapely's
+    # analytic methods have the proper coordinate order, no need to sort.
+    interiors = list(filter(lambda x: x.length > cutoff, polygon.interiors))
+    vertices = np.concatenate(
+                    [np.asarray(polygon.exterior)]
+                    + [np.asarray(r) for r in interiors])
+    codes = np.concatenate(
+                [ring_coding(polygon.exterior)]
+                + [ring_coding(r) for r in interiors])
+    return Path(vertices*scale+offset, codes)
+
+import matplotlib.patheffects as path_effects
+
 def plot_polygon(poly, fc='orange', ec='k', linewidth=0.7, scale=1.0, axes=None, zorder_mod=0):
     if axes is None:
         axs = plt.gca()
@@ -118,12 +145,14 @@ def plot_polygon(poly, fc='orange', ec='k', linewidth=0.7, scale=1.0, axes=None,
     else:
         axs = axes
     if isinstance(poly, sg.polygon.Polygon):
-        xs, ys = poly.exterior.xy
-        axs.fill(np.array(xs)/scale, np.array(ys)/scale, alpha=1, fc=fc, ec=ec, linewidth=linewidth, zorder=3+zorder_mod)
+        path = polygon_to_path(poly, scale=scale)
+        patch = PathPatch(path, facecolor=fc, edgecolor='black', linewidth=linewidth, zorder=3+zorder_mod)
+        axs.add_patch(patch)
+        #xs, ys = poly.exterior.xy
+        #plt.gca().fill(np.array(xs)/scale, np.array(ys)/scale, alpha=1, fc=fc, ec=ec, linewidth=linewidth, zorder=3+zorder_mod)
     elif isinstance(poly, sg.multipolygon.MultiPolygon):
         for p in poly:
-            xs, ys = p.exterior.xy
-            axs.fill(np.array(xs)/scale, np.array(ys)/scale, alpha=1, fc=fc, ec=ec, linewidth=linewidth, zorder=3+zorder_mod)
+            plot_polygon(poly, axes=axs, fc=fc, ec=ec, linewidth=linewidth, scale=scale, zorder_mod=zorder_mod)
     elif isinstance(poly, (tuple, list)):
         xs, ys = poly
         axs.fill(np.array(xs)/scale, np.array(ys)/scale, alpha=1, fc=fc, ec=ec, linewidth=linewidth, zorder=3+zorder_mod)
@@ -528,6 +557,8 @@ class Cartoon:
                 axs.xaxis.grid(False)
                 axs.yaxis.grid(True)
                 axs.axes.xaxis.set_ticklabels([])
+                plt.axis('on')
+                plt.margins(0,0) # needed to scale axes appropriately?
             else:
                 plt.axis('off')
                 plt.gca().set_axis_off()
@@ -683,3 +714,6 @@ def make_cartoon(args):
     else:
         colors = None
     molecule.plot(do_show=False, axes_labels=args.axes, colors=colors, color_residues_by=color_residues_by, dpi=args.dpi, save="{}.{}".format(args.save, args.format), shading=True, edge_color=args.edge_color, line_width=args.line_width)
+
+    if args.export:
+        molecule.export(args.export)
