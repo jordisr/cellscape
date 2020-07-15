@@ -120,7 +120,20 @@ def ring_coding(ob):
     codes[0] = Path.MOVETO
     return codes
 
-def polygon_to_path(polygon, cutoff=15, scale=1.0, offset=[0,0]):
+def transform_coord(xy, offset=np.array([0,0]), scale=1.0, flip=False, recenter=None):
+    # 2d coordinates
+    xy_ = xy
+    if recenter is not None:
+        # optionally shift coordinates before rotation
+        xy_ -= recenter
+    if flip:
+        xy_ = np.dot(xy_, np.array([[-1,0],[0,-1]]))
+        offset_x = np.min(xy_[:,0])
+        offset_y = np.min(xy_[:,1])
+        xy_ -= np.array([offset_x, offset_y])
+    return (xy_+offset)*scale
+
+def polygon_to_path(polygon, cutoff=15, offset=np.array([0,0]), scale=1.0, flip=False, recenter=None):
     # generate matplotlib Path object from Shapely polygon
     # filter out small interior holes and apply a scaling factor if desired
     #
@@ -134,28 +147,22 @@ def polygon_to_path(polygon, cutoff=15, scale=1.0, offset=[0,0]):
     codes = np.concatenate(
                 [ring_coding(polygon.exterior)]
                 + [ring_coding(r) for r in interiors])
-    return Path(vertices*scale+offset, codes)
+    transformed_vertices = transform_coord(vertices, offset=offset, scale=scale, flip=flip, recenter=recenter)
+    return Path(transformed_vertices, codes)
 
-import matplotlib.patheffects as path_effects
-
-def plot_polygon(poly, fc='orange', ec='k', linewidth=0.7, scale=1.0, axes=None, zorder_mod=0):
+def plot_polygon(poly, facecolor='orange', edgecolor='k', linewidth=0.7, axes=None, zorder_mod=0, offset=np.array([0,0]), scale=1.0, flip=False, recenter=None):
     if axes is None:
         axs = plt.gca()
         axs.set_aspect('equal')
     else:
         axs = axes
     if isinstance(poly, sg.polygon.Polygon):
-        path = polygon_to_path(poly, scale=scale)
-        patch = PathPatch(path, facecolor=fc, edgecolor='black', linewidth=linewidth, zorder=3+zorder_mod)
+        path = polygon_to_path(poly, offset=offset, scale=scale, flip=flip, recenter=recenter)
+        patch = PathPatch(path, facecolor=facecolor, edgecolor='black', linewidth=linewidth, zorder=3+zorder_mod)
         axs.add_patch(patch)
-        #xs, ys = poly.exterior.xy
-        #plt.gca().fill(np.array(xs)/scale, np.array(ys)/scale, alpha=1, fc=fc, ec=ec, linewidth=linewidth, zorder=3+zorder_mod)
     elif isinstance(poly, sg.multipolygon.MultiPolygon):
         for p in poly:
-            plot_polygon(poly, axes=axs, fc=fc, ec=ec, linewidth=linewidth, scale=scale, zorder_mod=zorder_mod)
-    elif isinstance(poly, (tuple, list)):
-        xs, ys = poly
-        axs.fill(np.array(xs)/scale, np.array(ys)/scale, alpha=1, fc=fc, ec=ec, linewidth=linewidth, zorder=3+zorder_mod)
+            plot_polygon(poly, axes=axs, facecolor=facecolor, edgecolor=edgecolor, linewidth=linewidth, scale=scale, zorder_mod=zorder_mod, offset=offset, flip=flip, recenter=recenter)
 
 def orientation_from_topology(topologies):
     # guess whether protein is N-C oriented based on UniProt topology annotation
@@ -434,6 +441,7 @@ class Cartoon:
                 self.rotated_coord -= np.array([0, tm_com_y, 0])
 
         self._polygons = []
+        self._styled_polygons = []
 
         # default radius for rendering atoms
         if only_ca and radius is None:
@@ -543,6 +551,8 @@ class Cartoon:
             - named discrete or continuous color scheme e.g. "Set1" (string)
         """
 
+        self._styled_polygons = []
+
         if shading:
             z_coord = self.rotated_coord[:,2]
             def rescale_coord(z):
@@ -606,9 +616,12 @@ class Cartoon:
                         sequential_colors = [colors[0]]
                     elif num_colors_needed == len(colors):
                         sequential_colors = colors
+                    else:
+                        sys.exit("Insufficient colors provided")
 
         if self._back_outline is not None:
-            plot_polygon(self._back_outline, fc="None", scale=1.0, axes=axs, ec=edge_color, linewidth=2, zorder_mod=-1)
+            plot_polygon(self._back_outline, facecolor="None", scale=1.0, axes=axs, edgecolor=edge_color, linewidth=2, zorder_mod=-1)
+            self._styled_polygons.append({"polygon":self._back_outline, "facecolor":"None", "ec":edge_color, "lw":2})
 
         if self.outline_by == "residue":
             # TODO clean this section up
@@ -632,7 +645,8 @@ class Cartoon:
                 if shading:
                     fc = shade_from_color(fc, rescale_coord(np.mean(p["xyz"][:,2])), range=shading_range)
 
-                plot_polygon(poly_to_draw, fc=fc, scale=1.0, axes=axs, ec=edge_color, linewidth=line_width)
+                plot_polygon(poly_to_draw, facecolor=fc, axes=axs, edgecolor=edge_color, linewidth=line_width)
+                self._styled_polygons.append({"polygon":poly_to_draw, "facecolor":fc, "edgecolor":edge_color, "linewidth":line_width})
 
         else:
             if isinstance(colors, dict):
@@ -642,7 +656,9 @@ class Cartoon:
                     poly_to_draw = smooth_polygon(p[1], level=1)
                 else:
                     poly_to_draw = p[1]
-                plot_polygon(poly_to_draw, fc=sequential_colors[i], scale=1.0, axes=axs, ec=edge_color, linewidth=line_width)
+                fc = sequential_colors[i]
+                plot_polygon(poly_to_draw, facecolor=fc, axes=axs, edgecolor=edge_color, linewidth=line_width)
+                self._styled_polygons.append({"polygon":poly_to_draw, "facecolor":fc, "edgecolor":edge_color, "linewidth":line_width})
 
         if save is not None:
             plt.savefig(save, dpi=dpi, transparent=True, pad_inches=0, bbox_inches='tight')
@@ -653,9 +669,7 @@ class Cartoon:
             return axs
 
     def export(self, fname, axes=None):
-        """
-        Find polygons in a matplotlib axes (after self.plot()) and export to pickle for scene building
-        """
+        assert(len(self._styled_polygons) > 0)
 
         if axes is None:
             ax = self._axes
@@ -669,12 +683,8 @@ class Cartoon:
         end_coord = np.mean(self.rotated_coord[:-50])
         bottom_coord = min(self.rotated_coord, key=operator.itemgetter(1))
         top_coord = max(self.rotated_coord, key=operator.itemgetter(1))
-        #print('\t'.join(map(str, [image_height, image_width, bottom_coord, top_coord])))
 
-        data = {'polygons':[], 'width':image_width, 'height':image_height, 'start':start_coord, 'end':end_coord, 'bottom':bottom_coord, 'top':top_coord}
-        # TODO does this account for patches with holes
-        for o in ax.findobj(matplotlib.patches.Polygon):
-            data['polygons'].append(o)
+        data = {'polygons':self._styled_polygons, 'width':image_width, 'height':image_height, 'start':start_coord, 'end':end_coord, 'bottom':bottom_coord, 'top':top_coord}
 
         with open('{}.pickle'.format(fname),'wb') as f:
             pickle.dump(data, f)
@@ -686,6 +696,7 @@ def make_cartoon(args):
 
     # accept list of chains for backwards-compatibility
     # convert to string e.g. ABCD for current interface
+    # can be an issue if chains have more than one letter
     if len(args.chain) == 1:
         chain = args.chain[0]
     else:
@@ -716,4 +727,4 @@ def make_cartoon(args):
     molecule.plot(do_show=False, axes_labels=args.axes, colors=colors, color_residues_by=color_residues_by, dpi=args.dpi, save="{}.{}".format(args.save, args.format), shading=True, edge_color=args.edge_color, line_width=args.line_width)
 
     if args.export:
-        molecule.export(args.export)
+        molecule.export(args.save)

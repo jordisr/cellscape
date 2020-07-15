@@ -12,6 +12,8 @@ import os, sys, argparse, pickle
 import glob
 import csv
 
+from .cartoon import plot_polygon
+
 def rotation_matrix_2d(theta):
     return np.array([[np.cos(theta), -1*np.sin(theta)],[np.sin(theta), np.cos(theta)]])
 
@@ -105,8 +107,6 @@ def make_scene(args):
             with open(path,'rb') as f:
                 data = pickle.load(f)
                 object_list.append(data)
-                coords = np.concatenate([p.get_xy() for p in data['polygons']])
-                data['height'] = np.max(coords[:,1]) # temporary bugfix
         num_files = len(args.files)
     elif args.csv:
         protein_data = dict()
@@ -162,7 +162,7 @@ def make_scene(args):
     if args.order_by == "random":
         np.random.shuffle(object_list)
     elif args.order_by == "height":
-        object_list = sorted(object_list, key=lambda x: x['height'], reverse=True)
+        object_list = sorted(object_list, key=lambda x: x['top'], reverse=True)
 
     # set font options
     font_options = {'family':'Arial', 'weight':'normal', 'size':10}
@@ -202,21 +202,6 @@ def make_scene(args):
         total_width = np.sum([o['width'] for o in object_list])+len(object_list)*args.padding
         membrane = membrane_cartoon(width=total_width, axes=axs, thickness=40)
 
-        # <-------------------------------------------------------------------------
-        # testing new code
-        #if args.membrane_interface and len(object_list) > 2:
-        #    skyline_pos = []
-        #    w=0
-        #    for i, o in enumerate(object_list):
-        #        skyline_pos.append([w,o['height']+np.random.rand()*10])
-        #        skyline_pos.append([w+o['width'],o['height']+np.random.rand()*10])
-        #        w += o['width'] + args.padding
-        #    skyline_pos = np.array(skyline_pos).T
-        #    membrane2 = membrane_cartoon(width=total_width, axes=axs, thickness=40, base_y=50)
-        #    membrane2.interpolate(skyline_pos[0], skyline_pos[1])
-        #    membrane2.draw(lipids=True)
-        # <-------------------------------------------------------------------------
-
         if args.membrane == "flat":
             membrane.flat()
         elif args.membrane == "arc":
@@ -228,18 +213,26 @@ def make_scene(args):
     # draw molecules
     w=0
     for i, o in enumerate(object_list):
-        y_offset = membrane.height_at(w+o['bottom'][0])-10
-        if args.recolor:
-            color = color_scheme[o['name']]
+        if args.membrane is not None:
+            y_offset = membrane.height_at(w+o['bottom'][0])-10
         else:
-            color = None
-        draw_object(o, axs, offset=[w, y_offset], color=color)
+            y_offset = 0
+        for p in o["polygons"]:
+            if args.recolor:
+                facecolor = color_scheme[o['name']]
+                edgecolor = 'black'
+            else:
+                facecolor = p["facecolor"]
+                edgecolor = p["edgecolor"]
+            plot_polygon(p["polygon"], offset=[w, y_offset], facecolor=facecolor, edgecolor=edgecolor, linewidth=p["linewidth"])
         w += o['width']+args.padding
 
     if args.background:
         background_w=0
         for i, o in enumerate(background_object_list):
-            draw_object(o, axs, offset=[background_w, 0], scaling=scaling_factor, background=True)
+            # draw_object(o, axs, offset=[background_w, 0], scaling=scaling_factor, background=True)
+            for p in o["polygons"]:
+                plot_polygon(p["polygon"], offset=[background_w, 0], scale=scaling_factor, facecolor=p["facecolor"], edgecolor=p["edgecolor"], linewidth=p["linewidth"]*scaling_factor)
             background_w += (o['width']+args.padding)
 
     plt.savefig(args.save+'.'+args.format, transparent=True, pad_inches=0, bbox_inches='tight', dpi=args.dpi)
