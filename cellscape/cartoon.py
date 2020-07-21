@@ -133,14 +133,14 @@ def transform_coord(xy, offset=np.array([0,0]), scale=1.0, flip=False, recenter=
         xy_ -= np.array([offset_x, offset_y])
     return (xy_+offset)*scale
 
-def polygon_to_path(polygon, cutoff=15, offset=np.array([0,0]), scale=1.0, flip=False, recenter=None):
+def polygon_to_path(polygon, min_interior_length=40, offset=np.array([0,0]), scale=1.0, flip=False, recenter=None):
     # generate matplotlib Path object from Shapely polygon
     # filter out small interior holes and apply a scaling factor if desired
     #
     # https://sgillies.net/2010/04/06/painting-punctured-polygons-with-matplotlib.html
     # Convert coordinates to path vertices. Objects produced by Shapely's
     # analytic methods have the proper coordinate order, no need to sort.
-    interiors = list(filter(lambda x: x.length > cutoff, polygon.interiors))
+    interiors = list(filter(lambda x: x.length > min_interior_length, polygon.interiors))
     vertices = np.concatenate(
                     [np.asarray(polygon.exterior)]
                     + [np.asarray(r) for r in interiors])
@@ -150,19 +150,20 @@ def polygon_to_path(polygon, cutoff=15, offset=np.array([0,0]), scale=1.0, flip=
     transformed_vertices = transform_coord(vertices, offset=offset, scale=scale, flip=flip, recenter=recenter)
     return Path(transformed_vertices, codes)
 
-def plot_polygon(poly, facecolor='orange', edgecolor='k', linewidth=0.7, axes=None, zorder_mod=0, offset=np.array([0,0]), scale=1.0, flip=False, recenter=None):
+def plot_polygon(poly, facecolor='orange', edgecolor='k', linewidth=0.7, axes=None, zorder_mod=0, offset=np.array([0,0]), scale=1.0, flip=False, recenter=None, min_area=15):
     if axes is None:
         axs = plt.gca()
         axs.set_aspect('equal')
     else:
         axs = axes
     if isinstance(poly, sg.polygon.Polygon):
-        path = polygon_to_path(poly, offset=offset, scale=scale, flip=flip, recenter=recenter)
-        patch = PathPatch(path, facecolor=facecolor, edgecolor='black', linewidth=linewidth, zorder=3+zorder_mod)
-        axs.add_patch(patch)
+        if poly.area > min_area:
+            path = polygon_to_path(poly, offset=offset, scale=scale, flip=flip, recenter=recenter)
+            patch = PathPatch(path, facecolor=facecolor, edgecolor='black', linewidth=linewidth, zorder=3+zorder_mod)
+            axs.add_patch(patch)
     elif isinstance(poly, sg.multipolygon.MultiPolygon):
         for p in poly:
-            plot_polygon(poly, axes=axs, facecolor=facecolor, edgecolor=edgecolor, linewidth=linewidth, scale=scale, zorder_mod=zorder_mod, offset=offset, flip=flip, recenter=recenter)
+            plot_polygon(p, axes=axs, facecolor=facecolor, edgecolor=edgecolor, linewidth=linewidth, scale=scale, zorder_mod=zorder_mod, offset=offset, flip=flip, recenter=recenter)
 
 def orientation_from_topology(topologies):
     # guess whether protein is N-C oriented based on UniProt topology annotation
@@ -196,6 +197,39 @@ def orientation_from_topology(topologies):
 
     print("guessed orientation:{}".format(orient_from_topo))
     return(orient_from_topo)
+
+def depth_slices_from_coord(xyz, width):
+    # split single xyz Nx3 matrix into list of Nx3 matrices
+    binned = (xyz[:,-1]/width).astype(int)
+    binned_shifted = binned - np.min(binned)
+    num_bins = np.max(binned_shifted)+1
+
+    total_coords = 0
+    slice_coords = []
+
+    for i in range(num_bins):
+        bin_coords = xyz[binned_shifted == i]
+        slice_coords.append(bin_coords)
+        total_coords += len(bin_coords)
+
+    assert(len(xyz) == total_coords)
+    return slice_coords
+
+def split_on_labels(m, labels):
+    num_bins = np.max(labels)+1
+    total_coords = 0
+    coords = []
+    for i in range(num_bins):
+        group_coords = m[labels == i]
+        coords.append(group_coords)
+        total_coords += len(group_coords)
+    assert(len(m) == total_coords)
+    return coords
+
+def get_z_slice_labels(xyz, width):
+    """ Take an Nx3 coordinate matrix and return labels"""
+    binned = (xyz[:,-1]/width).astype(int)
+    return binned - np.min(binned)
 
 class Cartoon:
     def __init__(self, file, model=0, chain="all", uniprot=None, view=True):
@@ -408,17 +442,14 @@ class Cartoon:
         self.view_matrix = np.loadtxt(p)
         self._set_nglview_orientation(self.view_matrix)
 
-    def outline(self, by="all", color=None, occlude=False, only_ca=False, only_annotated=False, radius=None, back_outline=False):
+    def outline(self, by="all", depth="contours", depth_contour_interval=3, occlude=False, only_ca=False, only_annotated=False, radius=None, back_outline=False):
+        # depth=[None, "flat", "contours"] doesn't affect by="residues"
 
         # collapse chain hierarchy into flat list
         self.residues_flat = [self.residues[c][i] for c in self.residues for i in self.residues[c]]
 
-        #print("Before", self.view._camera_orientation)
-        #print("Before2", self.view_matrix)
         if self.use_nglview:
             self._update_view_matrix()
-        #print("After", self.view._camera_orientation)
-        #print("After2", self.view_matrix)
 
         # transform atomic coordinates using view matrix
         self._apply_view_matrix()
@@ -452,19 +483,27 @@ class Cartoon:
         if back_outline:
             # space-filling outline of entire molecule
             if only_ca:
-                self._back_outline = so.unary_union([sg.Point(i).buffer(radius_) for i in self.rotated_coord[self.ca_atoms,:2]])
+                coord_to_outline = self.rotated_coord[self.ca_atoms,:2]
             else:
-                self._back_outline = so.unary_union([sg.Point(i).buffer(radius_) for i in self.rotated_coord[:,:2]])
+                coord_to_outline = self.rotated_coord[:,:2]
+            self._back_outline = so.unary_union([sg.Point(i).buffer(radius_) for i in coord_to_outline])
         else:
             self._back_outline = None
 
         if by == 'all':
             # space-filling outline of entire molecule
+            self.num_groups = 1
             if only_ca:
-                self._polygon = so.unary_union([sg.Point(i).buffer(radius_) for i in self.rotated_coord[self.ca_atoms,:2]])
+                coord_to_outline = self.rotated_coord[self.ca_atoms]
             else:
-                self._polygon = so.unary_union([sg.Point(i).buffer(radius_) for i in self.rotated_coord[:,:2]])
-            self._polygons.append(({}, self._polygon))
+                coord_to_outline = self.rotated_coord
+            if depth == "contours":
+                slice_coords = split_on_labels(coord_to_outline, get_z_slice_labels(coord_to_outline, width=depth_contour_interval))
+                for slice in slice_coords:
+                    self._polygons.append(({}, so.unary_union([sg.Point(i).buffer(radius_) for i in slice])))
+            else:
+                # depth=None and depth=flat are equivalent for by="all"
+                self._polygons.append(({}, so.unary_union([sg.Point(i).buffer(radius_) for i in coord_to_outline])))
         else:
             for res in self.residues_flat:
                 # pick range of atomic coordinates out of main data structure
@@ -475,7 +514,7 @@ class Cartoon:
                 res["xyz"] = res_coords
 
         if by == 'residue':
-            for res in self.residues_flat:
+            for res in sorted(self.residues_flat, key=lambda res: np.mean(res["xyz"][:,-1])):
                 group_outline = so.cascaded_union([sg.Point(i).buffer(radius_) for i in res["xyz"] ])
                 res["polygon"] = group_outline
                 self._polygons.append((res, group_outline))
@@ -485,52 +524,57 @@ class Cartoon:
             if by in ['domain', 'topology']:
                 assert(self._uniprot_xml is not None)
 
+            # TODO comment code and be consistent with variable names group vs region
             residue_groups = group_by(self.residues_flat, key=lambda x: x.get(by))
-            if occlude:
-                region_polygons = {c:[] for c in sorted(residue_groups.keys(), key=not_none)}
-                view_object = None
-                for res in sorted(self.residues_flat, key=lambda res: np.mean(res["xyz"][:,-1]), reverse=True):
-                    coords = res["xyz"]
-                    if not only_annotated or res.get(by) is not None:
-                        space_filling = sg.Point(coords[0]).buffer(radius_)
-                        for i in coords:
-                            #space_filling = space_filling.union(sg.Point(i).buffer(radius_))
-                            space_filling = safe_union(space_filling, sg.Point(i).buffer(radius_))
-                        #space_filling = so.cascaded_union([sg.Point(i*10+np.random.random(3)).buffer(15) for i in coords])
 
-                        if not view_object:
-                            # initialize if unassigned
-                            view_object = space_filling
-                        else:
-                            if view_object.disjoint(space_filling):
-                                # residue doesn't overlap with view so add it to the view
-                                view_object = safe_union(view_object, space_filling)
-                                region_polygons[res.get(by)].append(space_filling)
+            self.num_groups = len(residue_groups)
+            region_atoms = dict() # residue group to atomic indices
+            total_atoms = 0
+            for k,v in residue_groups.items():
+                region_atoms[k] = []
+                for res in v:
+                    if only_ca:
+                        region_atoms[k].extend(range(*res['coord_ca']))
+                    else:
+                        region_atoms[k].extend(range(*res['coord']))
+                region_atoms[k] = np.array(region_atoms[k], dtype=int)
+                total_atoms += len(region_atoms[k])
+            #print("ATOMS", total_atoms, len(self.rotated_coord)) # for debugging
 
-                            elif view_object.contains(space_filling):
-                                # residue completely covered and not visible
-                                pass
-                            else:
-                                # residue partially occluded
-                                #   don't want small holes from other entries
-                                # BUG source of TopologyExceptions when accumulating outlines
-                                # putting in a threshold for taking the difference seems to work ok
-                                #   in one case but I haven't widely tested it
-                                difference = space_filling.difference(view_object)
-                                #if difference.area > 5:
-                                region_polygons[res.get(by)].append(difference.buffer(0.1))
-                                view_object = safe_union(view_object, space_filling)
+            if depth is not None:
 
-                for i, (region_name, region_polygon) in enumerate(region_polygons.items()):
-                    if not only_annotated or region_name is not None:
-                        print(i)
-                        self._polygons.append(({by:region_name}, so.unary_union(region_polygon)))
+                slice_labels = get_z_slice_labels(self.rotated_coord, width=depth_contour_interval)
+                num_slices = np.max(slice_labels)+1
+
+                if depth == "contours":
+                    for s in range(num_slices):
+                        for group_i, (group_name, group_res) in enumerate(sorted(residue_groups.items())):
+                            if not only_annotated or group_name is not None:
+                                atom_indices = region_atoms[group_name]
+                                slice_coords = self.rotated_coord[atom_indices][slice_labels[atom_indices] == s]
+                                self._polygons.append(({by:group_name}, so.unary_union([sg.Point(c).buffer(radius_) for c in slice_coords])))
+
+                elif depth == "flat":
+                    empty_polygon = sg.Point((0,0)).buffer(0)
+                    view_object = empty_polygon
+                    region_polygons = dict()
+                    for slice in range(num_slices, 0, -1):
+                        for group_i, (group_name, group_res) in enumerate(sorted(residue_groups.items())):
+                            if not only_annotated or group_name is not None:
+                                atom_indices = region_atoms[group_name]
+                                slice_coords = self.rotated_coord[atom_indices][slice_labels[atom_indices] == slice]
+                                poly = so.unary_union([sg.Point(c).buffer(radius_) for c in slice_coords])
+                                this_difference = poly.difference(view_object)
+                                region_polygons[group_name] = region_polygons.get(group_name, empty_polygon).union(this_difference.buffer(0.01))
+                                view_object = view_object.union(this_difference.buffer(0.01))
+
+                    for k,v in region_polygons.items():
+                        self._polygons.append(({by:k}, v))
+
             else:
-                residue_groups = group_by(self.residues_flat, key=lambda x: x.get(by))
-                for group_i, (group_name, group_res) in enumerate(sorted(residue_groups.items(), key=not_none)):
+                for group_i, (group_name, group_res) in enumerate(residue_groups.items()):
                     if not only_annotated or group_name is not None:
-                        print(group_name)
-                        group_coords = np.concatenate([self.rotated_coord[range(*r['coord'])] for r in group_res])
+                        group_coords = self.rotated_coord[region_atoms[group_name]]
                         self._polygons.append(({by:group_name}, so.unary_union([sg.Point(i).buffer(radius_) for i in group_coords])))
 
         self.outline_by = by
@@ -590,6 +634,8 @@ class Cartoon:
             else:
                 residue_color_groups = group_by(self.residues_flat, lambda x: x.get(color_residues_by))
                 num_colors_needed = len(residue_color_groups)
+        elif self.outline_by == "all":
+            num_colors_needed = 1
         else:
             num_colors_needed = len(self._polygons)
 
@@ -597,9 +643,10 @@ class Cartoon:
         default_cmap = 'Set1'
         named_colors = [*mcolors.BASE_COLORS.keys(), *mcolors.TABLEAU_COLORS.keys(), *mcolors.CSS4_COLORS.keys(), *mcolors.XKCD_COLORS.keys()]
 
+        # TODO clean this up. edge case of single color but multiple slices
         if colors is None:
             if num_colors_needed == 1:
-                sequential_colors = [default_color]
+                sequential_colors = [default_color for i in self._polygons]
             else:
                 sequential_colors = get_sequential_colors(colors=default_cmap, n=num_colors_needed)
         else:
@@ -608,12 +655,12 @@ class Cartoon:
             else:
                 if isinstance(colors, str):
                     if num_colors_needed == 1:
-                        sequential_colors = [colors]
+                        sequential_colors = [colors for i in self._polygons]
                     else:
                         sequential_colors = get_sequential_colors(colors=colors, n=num_colors_needed)
                 elif isinstance(colors, (list, tuple)):
                     if num_colors_needed == 1:
-                        sequential_colors = [colors[0]]
+                        sequential_colors = [colors[0] for i in self._polygons]
                     elif num_colors_needed == len(colors):
                         sequential_colors = colors
                     else:
@@ -624,26 +671,25 @@ class Cartoon:
             self._styled_polygons.append({"polygon":self._back_outline, "facecolor":"None", "ec":edge_color, "lw":2})
 
         if self.outline_by == "residue":
-            # TODO clean this section up
             if len(sequential_colors) > 0:
                 color_map = {k:sequential_colors[i] for i,k in enumerate(residue_color_groups.keys())}
             else:
                 color_map = colors
 
-            z_sorted_residues = sorted(self.residues_flat, key=lambda res: np.mean(res["xyz"][:,-1]))
-            for i, p in enumerate(z_sorted_residues):
+            for i, p in enumerate(self._polygons):
                 if smoothing:
-                    poly_to_draw = smooth_polygon(p["polygon"], level=1)
+                    poly_to_draw = smooth_polygon(p[1], level=1)
                 else:
-                    poly_to_draw = p["polygon"]
-                color_value = p.get(color_residues_by)
+                    poly_to_draw = p[1]
+                color_value = p[0].get(color_residues_by)
                 if isinstance(colors, dict):
                     fc = color_map[color_value]
                 else:
                     fc = color_map.get(color_value, sequential_colors[0])
 
                 if shading:
-                    fc = shade_from_color(fc, rescale_coord(np.mean(p["xyz"][:,2])), range=shading_range)
+                    # TODO add depth attribute, makes sense to compute during outline and store with polygon
+                    fc = shade_from_color(fc, i/len(self._polygons), range=shading_range)
 
                 plot_polygon(poly_to_draw, facecolor=fc, axes=axs, edgecolor=edge_color, linewidth=line_width)
                 self._styled_polygons.append({"polygon":poly_to_draw, "facecolor":fc, "edgecolor":edge_color, "linewidth":line_width})
@@ -656,8 +702,13 @@ class Cartoon:
                     poly_to_draw = smooth_polygon(p[1], level=1)
                 else:
                     poly_to_draw = p[1]
+                print("Choose color from", p[0].get(self.outline_by))
                 fc = sequential_colors[i]
+                if shading:
+                    # TODO add depth attribute, makes sense to compute during outline and store with polygon
+                    fc = shade_from_color(fc, i/len(self._polygons), range=shading_range)
                 plot_polygon(poly_to_draw, facecolor=fc, axes=axs, edgecolor=edge_color, linewidth=line_width)
+                # TODO instead of separate variable, just add style info to polygon?
                 self._styled_polygons.append({"polygon":poly_to_draw, "facecolor":fc, "edgecolor":edge_color, "linewidth":line_width})
 
         if save is not None:
