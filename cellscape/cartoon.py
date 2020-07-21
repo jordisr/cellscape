@@ -442,8 +442,12 @@ class Cartoon:
         self.view_matrix = np.loadtxt(p)
         self._set_nglview_orientation(self.view_matrix)
 
-    def outline(self, by="all", depth="contours", depth_contour_interval=3, occlude=False, only_ca=False, only_annotated=False, radius=None, back_outline=False):
-        # depth=[None, "flat", "contours"] doesn't affect by="residues"
+    def outline(self, by="all", depth=None, depth_contour_interval=3, occlude=False, only_ca=False, only_annotated=False, radius=None, back_outline=False):
+
+        # check options
+        assert by in ["all", "residue", "chain", "topology"], "Option not recognized"
+        assert depth in [None, "flat", "contours"], "Option not recognized"
+        # depth option doesn't affect by="residues"
 
         # collapse chain hierarchy into flat list
         self.residues_flat = [self.residues[c][i] for c in self.residues for i in self.residues[c]]
@@ -526,6 +530,7 @@ class Cartoon:
 
             # TODO comment code and be consistent with variable names group vs region
             residue_groups = group_by(self.residues_flat, key=lambda x: x.get(by))
+            self.groups = sorted(residue_groups.keys())
 
             self.num_groups = len(residue_groups)
             region_atoms = dict() # residue group to atomic indices
@@ -578,9 +583,9 @@ class Cartoon:
                         self._polygons.append(({by:group_name}, so.unary_union([sg.Point(i).buffer(radius_) for i in group_coords])))
 
         self.outline_by = by
-        print("Outlined some atoms!", file=sys.stderr)
+        print("Outlined {} polygons!".format(len(self._polygons)), file=sys.stderr)
 
-    def plot(self, axes_labels=False, colors=None, color_residues_by=None, edge_color="black", line_width=0.7, shading=False, shading_range=0.6, smoothing=False, do_show=True, axes=None, save=None, dpi=300):
+    def plot(self, colors=None, axes_labels=False, color_residues_by=None, edge_color="black", line_width=0.7, shading=False, shading_range=0.6, smoothing=False, do_show=True, axes=None, save=None, dpi=300):
         """
         mirroring biopython's phylogeny drawing options
         https://biopython.org/DIST/docs/api/Bio.Phylo._utils-module.html
@@ -625,8 +630,12 @@ class Cartoon:
             axs = axes
         self._axes= axs
 
-        # TODO this should all be cleaned up, add more checking
-        # TODO What if you're repeating colors (e.g. same domains)
+        # color schemes
+        default_color = '#D3D3D3'
+        default_cmap = 'Set1'
+        named_colors = [*mcolors.BASE_COLORS.keys(), *mcolors.TABLEAU_COLORS.keys(), *mcolors.CSS4_COLORS.keys(), *mcolors.XKCD_COLORS.keys()]
+
+        # if outlining residues don't know number of color groups until plot is called
         if self.outline_by == "residue":
             if color_residues_by is None:
                 num_colors_needed = 1
@@ -634,82 +643,71 @@ class Cartoon:
             else:
                 residue_color_groups = group_by(self.residues_flat, lambda x: x.get(color_residues_by))
                 num_colors_needed = len(residue_color_groups)
-        elif self.outline_by == "all":
-            num_colors_needed = 1
-        else:
-            num_colors_needed = len(self._polygons)
+            self.num_groups = num_colors_needed
 
-        default_color = '#D3D3D3'
-        default_cmap = 'Set1'
-        named_colors = [*mcolors.BASE_COLORS.keys(), *mcolors.TABLEAU_COLORS.keys(), *mcolors.CSS4_COLORS.keys(), *mcolors.XKCD_COLORS.keys()]
-
-        # TODO clean this up. edge case of single color but multiple slices
+        # parse options and get list of base colors needed for plotting
         if colors is None:
-            if num_colors_needed == 1:
-                sequential_colors = [default_color for i in self._polygons]
+            if self.num_groups == 1:
+                sequential_colors = [default_color]
             else:
-                sequential_colors = get_sequential_colors(colors=default_cmap, n=num_colors_needed)
+                sequential_colors = get_sequential_colors(colors=default_cmap, n=self.num_groups)
         else:
             if isinstance(colors, dict):
                 sequential_colors = []
             else:
                 if isinstance(colors, str):
-                    if num_colors_needed == 1:
-                        sequential_colors = [colors for i in self._polygons]
+                    if self.num_groups == 1:
+                        sequential_colors = [colors]
                     else:
-                        sequential_colors = get_sequential_colors(colors=colors, n=num_colors_needed)
+                        sequential_colors = get_sequential_colors(colors=colors, n=self.num_groups)
                 elif isinstance(colors, (list, tuple)):
-                    if num_colors_needed == 1:
-                        sequential_colors = [colors[0] for i in self._polygons]
-                    elif num_colors_needed == len(colors):
+                    if self.num_groups == 1:
+                        sequential_colors = [colors[0]]
+                    elif self.num_groups == len(colors):
                         sequential_colors = colors
                     else:
                         sys.exit("Insufficient colors provided")
+        assert(len(sequential_colors) == self.num_groups)
 
-        if self._back_outline is not None:
-            plot_polygon(self._back_outline, facecolor="None", scale=1.0, axes=axs, edgecolor=edge_color, linewidth=2, zorder_mod=-1)
-            self._styled_polygons.append({"polygon":self._back_outline, "facecolor":"None", "ec":edge_color, "lw":2})
-
+        # color scheme represented as dict that maps group names to colors
         if self.outline_by == "residue":
             if len(sequential_colors) > 0:
                 color_map = {k:sequential_colors[i] for i,k in enumerate(residue_color_groups.keys())}
             else:
                 color_map = colors
-
-            for i, p in enumerate(self._polygons):
-                if smoothing:
-                    poly_to_draw = smooth_polygon(p[1], level=1)
-                else:
-                    poly_to_draw = p[1]
-                color_value = p[0].get(color_residues_by)
-                if isinstance(colors, dict):
-                    fc = color_map[color_value]
-                else:
-                    fc = color_map.get(color_value, sequential_colors[0])
-
-                if shading:
-                    # TODO add depth attribute, makes sense to compute during outline and store with polygon
-                    fc = shade_from_color(fc, i/len(self._polygons), range=shading_range)
-
-                plot_polygon(poly_to_draw, facecolor=fc, axes=axs, edgecolor=edge_color, linewidth=line_width)
-                self._styled_polygons.append({"polygon":poly_to_draw, "facecolor":fc, "edgecolor":edge_color, "linewidth":line_width})
-
+        elif self.outline_by == "all":
+            color_map = {None:sequential_colors[0]}
         else:
-            if isinstance(colors, dict):
-                sequential_colors = [colors[p[0][self.outline_by]] for p in self._polygons]
-            for i, p in enumerate(self._polygons):
-                if smoothing:
-                    poly_to_draw = smooth_polygon(p[1], level=1)
-                else:
-                    poly_to_draw = p[1]
-                print("Choose color from", p[0].get(self.outline_by))
-                fc = sequential_colors[i]
-                if shading:
-                    # TODO add depth attribute, makes sense to compute during outline and store with polygon
-                    fc = shade_from_color(fc, i/len(self._polygons), range=shading_range)
-                plot_polygon(poly_to_draw, facecolor=fc, axes=axs, edgecolor=edge_color, linewidth=line_width)
-                # TODO instead of separate variable, just add style info to polygon?
-                self._styled_polygons.append({"polygon":poly_to_draw, "facecolor":fc, "edgecolor":edge_color, "linewidth":line_width})
+            if len(sequential_colors) > 0:
+                color_map = {k:sequential_colors[i] for i,k in enumerate(self.groups)}
+            else:
+                color_map = colors
+        assert(isinstance(color_map, dict))
+
+        if self._back_outline is not None:
+            plot_polygon(self._back_outline, facecolor="None", scale=1.0, axes=axs, edgecolor=edge_color, linewidth=2, zorder_mod=-1)
+            self._styled_polygons.append({"polygon":self._back_outline, "facecolor":"None", "ec":edge_color, "lw":2})
+
+        # main plotting loop
+        for i, p in enumerate(self._polygons):
+            if smoothing:
+                poly_to_draw = smooth_polygon(p[1], level=1)
+            else:
+                poly_to_draw = p[1]
+
+            # look up color for polygon
+            if self.outline_by == "residue":
+                key_for_color = p[0].get(color_residues_by)
+            else:
+                key_for_color = p[0].get(self.outline_by)
+            fc = color_map.get(key_for_color, sequential_colors[0])
+
+            if shading:
+                # TODO add depth attribute, makes sense to compute during outline and store with polygon
+                fc = shade_from_color(fc, i/len(self._polygons), range=shading_range)
+            plot_polygon(poly_to_draw, facecolor=fc, axes=axs, edgecolor=edge_color, linewidth=line_width)
+            # TODO instead of separate variable, just add style info to polygon?
+            self._styled_polygons.append({"polygon":poly_to_draw, "facecolor":fc, "edgecolor":edge_color, "linewidth":line_width})
 
         if save is not None:
             plt.savefig(save, dpi=dpi, transparent=True, pad_inches=0, bbox_inches='tight')
