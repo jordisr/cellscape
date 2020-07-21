@@ -80,6 +80,9 @@ def safe_union(a, b):
         return a
     return c
 
+def scale_line_width(x, lw_min, lw_max):
+    return lw_max*(1-x) + lw_min*x
+
 def shade_from_color(color, x, range):
     (r, g, b, a) = mcolors.to_rgba(color)
     h, l, s = colorsys.rgb_to_hls(r,g,b)
@@ -475,6 +478,7 @@ class Cartoon:
                 print("shifted for transmembrane region by {} angstroms".format(tm_com_y))
                 self.rotated_coord -= np.array([0, tm_com_y, 0])
 
+        self._rescale_z = lambda z: (z-np.min(self.rotated_coord[:,-1]))/(np.max(self.rotated_coord[:,-1])-np.min(self.rotated_coord[:,-1]))
         self._polygons = []
         self._styled_polygons = []
 
@@ -521,6 +525,7 @@ class Cartoon:
             for res in sorted(self.residues_flat, key=lambda res: np.mean(res["xyz"][:,-1])):
                 group_outline = so.cascaded_union([sg.Point(i).buffer(radius_) for i in res["xyz"] ])
                 res["polygon"] = group_outline
+                res["depth"] = self._rescale_z(np.mean(res["xyz"][:,-1]))
                 self._polygons.append((res, group_outline))
 
         elif by in ['domain', 'topology', 'chain']:
@@ -557,7 +562,9 @@ class Cartoon:
                             if not only_annotated or group_name is not None:
                                 atom_indices = region_atoms[group_name]
                                 slice_coords = self.rotated_coord[atom_indices][slice_labels[atom_indices] == s]
-                                self._polygons.append(({by:group_name}, so.unary_union([sg.Point(c).buffer(radius_) for c in slice_coords])))
+                                if len(slice_coords) > 0:
+                                    slice_depth = self._rescale_z(np.mean(slice_coords[:,-1]))
+                                    self._polygons.append(({by:group_name, "depth":slice_depth}, so.unary_union([sg.Point(c).buffer(radius_) for c in slice_coords])))
 
                 elif depth == "flat":
                     empty_polygon = sg.Point((0,0)).buffer(0)
@@ -585,7 +592,8 @@ class Cartoon:
         self.outline_by = by
         print("Outlined {} polygons!".format(len(self._polygons)), file=sys.stderr)
 
-    def plot(self, colors=None, axes_labels=False, color_residues_by=None, edge_color="black", line_width=0.7, shading=False, shading_range=0.6, smoothing=False, do_show=True, axes=None, save=None, dpi=300):
+    def plot(self, colors=None, axes_labels=False, color_residues_by=None, edge_color="black", line_width=0.7,
+        depth_shading=False, depth_lines=False, shading_range=0.6, smoothing=False, do_show=True, axes=None, save=None, dpi=300):
         """
         mirroring biopython's phylogeny drawing options
         https://biopython.org/DIST/docs/api/Bio.Phylo._utils-module.html
@@ -601,11 +609,6 @@ class Cartoon:
         """
 
         self._styled_polygons = []
-
-        if shading:
-            z_coord = self.rotated_coord[:,2]
-            def rescale_coord(z):
-                return (z-np.min(z_coord))/(np.max(z_coord)-np.min(z_coord))
 
         if axes is None:
             # create a new matplotlib figure if none provided
@@ -702,12 +705,16 @@ class Cartoon:
                 key_for_color = p[0].get(self.outline_by)
             fc = color_map.get(key_for_color, sequential_colors[0])
 
-            if shading:
-                # TODO add depth attribute, makes sense to compute during outline and store with polygon
-                fc = shade_from_color(fc, i/len(self._polygons), range=shading_range)
-            plot_polygon(poly_to_draw, facecolor=fc, axes=axs, edgecolor=edge_color, linewidth=line_width)
+            if depth_shading:
+                #fc = shade_from_color(fc, i/len(self._polygons), range=shading_range)
+                fc = shade_from_color(fc, p[0].get("depth", 0.5), range=shading_range)
+            if depth_lines:
+                lw = scale_line_width(p[0].get("depth", 0.5), 0, 0.5)
+            else:
+                lw = line_width
+            plot_polygon(poly_to_draw, facecolor=fc, axes=axs, edgecolor=edge_color, linewidth=lw)
             # TODO instead of separate variable, just add style info to polygon?
-            self._styled_polygons.append({"polygon":poly_to_draw, "facecolor":fc, "edgecolor":edge_color, "linewidth":line_width})
+            self._styled_polygons.append({"polygon":poly_to_draw, "facecolor":fc, "edgecolor":edge_color, "linewidth":lw})
 
         if save is not None:
             plt.savefig(save, dpi=dpi, transparent=True, pad_inches=0, bbox_inches='tight')
@@ -773,7 +780,7 @@ def make_cartoon(args):
         colors = args.colors
     else:
         colors = None
-    molecule.plot(do_show=False, axes_labels=args.axes, colors=colors, color_residues_by=color_residues_by, dpi=args.dpi, save="{}.{}".format(args.save, args.format), shading=True, edge_color=args.edge_color, line_width=args.line_width)
+    molecule.plot(do_show=False, axes_labels=args.axes, colors=colors, color_residues_by=color_residues_by, dpi=args.dpi, save="{}.{}".format(args.save, args.format), depth_shading=True, edge_color=args.edge_color, line_width=args.line_width)
 
     if args.export:
         molecule.export(args.save)
