@@ -153,7 +153,7 @@ def polygon_to_path(polygon, min_interior_length=40, offset=np.array([0,0]), sca
     transformed_vertices = transform_coord(vertices, offset=offset, scale=scale, flip=flip, recenter=recenter)
     return Path(transformed_vertices, codes)
 
-def plot_polygon(poly, facecolor='orange', edgecolor='k', linewidth=0.7, axes=None, zorder_mod=0, offset=np.array([0,0]), scale=1.0, flip=False, recenter=None, min_area=15):
+def plot_polygon(poly, facecolor='orange', edgecolor='k', linewidth=0.7, axes=None, zorder_mod=0, offset=np.array([0,0]), scale=1.0, flip=False, recenter=None, min_area=7):
     if axes is None:
         axs = plt.gca()
         axs.set_aspect('equal')
@@ -448,7 +448,7 @@ class Cartoon:
     def outline(self, by="all", depth=None, depth_contour_interval=3, occlude=False, only_ca=False, only_annotated=False, radius=None, back_outline=False):
 
         # check options
-        assert by in ["all", "residue", "chain", "topology"], "Option not recognized"
+        assert by in ["all", "residue", "chain", "domain", "topology"], "Option not recognized"
         assert depth in [None, "flat", "contours"], "Option not recognized"
         # depth option doesn't affect by="residues"
 
@@ -488,16 +488,6 @@ class Cartoon:
         else:
             radius_ = 1.5
 
-        if back_outline:
-            # space-filling outline of entire molecule
-            if only_ca:
-                coord_to_outline = self.rotated_coord[self.ca_atoms,:2]
-            else:
-                coord_to_outline = self.rotated_coord[:,:2]
-            self._back_outline = so.unary_union([sg.Point(i).buffer(radius_) for i in coord_to_outline])
-        else:
-            self._back_outline = None
-
         if by == 'all':
             # space-filling outline of entire molecule
             self.num_groups = 1
@@ -508,7 +498,8 @@ class Cartoon:
             if depth == "contours":
                 slice_coords = split_on_labels(coord_to_outline, get_z_slice_labels(coord_to_outline, width=depth_contour_interval))
                 for slice in slice_coords:
-                    self._polygons.append(({}, so.unary_union([sg.Point(i).buffer(radius_) for i in slice])))
+                    slice_depth = self._rescale_z(np.mean(slice[:,-1]))
+                    self._polygons.append(({"depth":slice_depth}, so.unary_union([sg.Point(i).buffer(radius_) for i in slice])))
             else:
                 # depth=None and depth=flat are equivalent for by="all"
                 self._polygons.append(({}, so.unary_union([sg.Point(i).buffer(radius_) for i in coord_to_outline])))
@@ -535,7 +526,7 @@ class Cartoon:
 
             # TODO comment code and be consistent with variable names group vs region
             residue_groups = group_by(self.residues_flat, key=lambda x: x.get(by))
-            self.groups = sorted(residue_groups.keys())
+            self.groups = sorted(residue_groups.keys(), key=lambda x: (x is None, x))
 
             self.num_groups = len(residue_groups)
             region_atoms = dict() # residue group to atomic indices
@@ -558,7 +549,7 @@ class Cartoon:
 
                 if depth == "contours":
                     for s in range(num_slices):
-                        for group_i, (group_name, group_res) in enumerate(sorted(residue_groups.items())):
+                        for group_i, (group_name, group_res) in enumerate(sorted(residue_groups.items(), key=lambda x: (x[0] is None, x))):
                             if not only_annotated or group_name is not None:
                                 atom_indices = region_atoms[group_name]
                                 slice_coords = self.rotated_coord[atom_indices][slice_labels[atom_indices] == s]
@@ -571,7 +562,7 @@ class Cartoon:
                     view_object = empty_polygon
                     region_polygons = dict()
                     for slice in range(num_slices, 0, -1):
-                        for group_i, (group_name, group_res) in enumerate(sorted(residue_groups.items())):
+                        for group_i, (group_name, group_res) in enumerate(sorted(residue_groups.items(), key=lambda x: (x[0] is None, x))):
                             if not only_annotated or group_name is not None:
                                 atom_indices = region_atoms[group_name]
                                 slice_coords = self.rotated_coord[atom_indices][slice_labels[atom_indices] == slice]
@@ -589,11 +580,16 @@ class Cartoon:
                         group_coords = self.rotated_coord[region_atoms[group_name]]
                         self._polygons.append(({by:group_name}, so.unary_union([sg.Point(i).buffer(radius_) for i in group_coords])))
 
+        if back_outline:
+            self._back_outline =  so.unary_union([p[1].buffer(0.01) for p in self._polygons])
+        else:
+            self._back_outline = None
+
         self.outline_by = by
         print("Outlined {} polygons!".format(len(self._polygons)), file=sys.stderr)
 
     def plot(self, colors=None, axes_labels=False, color_residues_by=None, edge_color="black", line_width=0.7,
-        depth_shading=False, depth_lines=False, shading_range=0.6, smoothing=False, do_show=True, axes=None, save=None, dpi=300):
+        depth_shading=False, depth_lines=False, shading_range=0.4, smoothing=False, do_show=True, axes=None, save=None, dpi=300):
         """
         mirroring biopython's phylogeny drawing options
         https://biopython.org/DIST/docs/api/Bio.Phylo._utils-module.html
@@ -665,7 +661,11 @@ class Cartoon:
                         sequential_colors = get_sequential_colors(colors=colors, n=self.num_groups)
                 elif isinstance(colors, (list, tuple)):
                     if self.num_groups == 1:
-                        sequential_colors = [colors[0]]
+                        if (len(colors) == 4) or (len(colors) == 3):
+                            # assume single RGBA or RGB color
+                            sequential_colors = [colors]
+                        else:
+                            sequential_colors = [colors[0]]
                     elif self.num_groups == len(colors):
                         sequential_colors = colors
                     else:
@@ -689,7 +689,7 @@ class Cartoon:
 
         if self._back_outline is not None:
             plot_polygon(self._back_outline, facecolor="None", scale=1.0, axes=axs, edgecolor=edge_color, linewidth=2, zorder_mod=-1)
-            self._styled_polygons.append({"polygon":self._back_outline, "facecolor":"None", "ec":edge_color, "lw":2})
+            self._styled_polygons.append({"polygon":self._back_outline, "facecolor":"None", "edgecolor":edge_color, "linewidth":1})
 
         # main plotting loop
         for i, p in enumerate(self._polygons):

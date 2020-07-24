@@ -9,7 +9,8 @@ import json
 
 class UniprotRecord:
     """Data structure to hold topological/domain information"""
-    def __init__(self,name):
+    def __init__(self, id, name=None):
+        self.id = id
         self.name = name
         self.domains = []
         self.topology = []
@@ -51,8 +52,9 @@ def parse_xml(xmlpath):
     sequences = []
 
     for entry in tree.iter(tag=ns+'entry'):
-        accession = entry.find(ns+'accession')
-        sequence = UniprotRecord(accession.text)
+        accession = entry.find(ns+'accession').text
+        gene = entry.find(ns+'name').text
+        sequence = UniprotRecord(accession, gene)
 
         for feature in entry.iter(tag=ns+'feature'):
 
@@ -83,6 +85,16 @@ def parse_xml(xmlpath):
                 sequence.sequence = seq.text.replace('\n','')
 
     return(sequences)
+
+def split_uniprot_xml(xmlpath, outpath='.'):
+    # take file of multiple uniprot records and split to individual files
+    tree = ET.parse(xmlpath)
+    root = tree.getroot()
+    ns = '{http://uniprot.org/uniprot}'
+    for entry in tree.iter(tag=ns+'entry'):
+        accession = entry.find(ns+'accession')
+        with open("{}/{}.xml".format(outpath, accession.text), "w") as xml_out:
+            xml_out.write(ET.tostring(entry).decode('utf-8'))
 
 if __name__ == "__main__":
 
