@@ -114,7 +114,7 @@ def make_scene(args):
             reader = csv.DictReader(csvfile)
             for row in reader:
                 (name, stoich, path) = (row['name'], float(row[args.sample_from]), row['file'])
-                with open(path+'.pickle','rb') as f:
+                with open(path,'rb') as f:
                     data = pickle.load(f)
                     data['name'] = name
                     data['stoichiometry'] = stoich
@@ -162,7 +162,7 @@ def make_scene(args):
     if args.order_by == "random":
         np.random.shuffle(object_list)
     elif args.order_by == "height":
-        object_list = sorted(object_list, key=lambda x: x['top'], reverse=True)
+        object_list = sorted(object_list, key=lambda x: x['height'], reverse=True)
 
     # set font options
     font_options = {'family':'Arial', 'weight':'normal', 'size':10}
@@ -232,7 +232,7 @@ def make_scene(args):
         for i, o in enumerate(background_object_list):
             # draw_object(o, axs, offset=[background_w, 0], scaling=scaling_factor, background=True)
             for p in o["polygons"]:
-                plot_polygon(p["polygon"], offset=[background_w, 0], scale=scaling_factor, facecolor=p["facecolor"], edgecolor=p["edgecolor"], linewidth=p["linewidth"]*scaling_factor)
+                plot_polygon(p["polygon"], offset=[background_w, 0], scale=scaling_factor, facecolor=p["facecolor"], edgecolor=p["edgecolor"], linewidth=p["linewidth"]*scaling_factor, zorder_mod=-2)
             background_w += (o['width']+args.padding)
 
     plt.savefig(args.save+'.'+args.format, transparent=True, pad_inches=0, bbox_inches='tight', dpi=args.dpi)

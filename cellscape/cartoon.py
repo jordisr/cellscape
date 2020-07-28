@@ -445,7 +445,7 @@ class Cartoon:
         self.view_matrix = np.loadtxt(p)
         self._set_nglview_orientation(self.view_matrix)
 
-    def outline(self, by="all", depth=None, depth_contour_interval=3, occlude=False, only_ca=False, only_annotated=False, radius=None, back_outline=False):
+    def outline(self, by="all", depth=None, depth_contour_interval=3, occlude=False, only_ca=False, only_annotated=False, radius=None, back_outline=False, align_transmembrane=False):
 
         # check options
         assert by in ["all", "residue", "chain", "domain", "topology"], "Option not recognized"
@@ -467,7 +467,7 @@ class Cartoon:
         self.rotated_coord -= np.array([offset_x, offset_y, 0])
 
         # calculate vertical offset for transmembrane proteins
-        if self._uniprot_xml:
+        if self._uniprot_xml and align_transmembrane:
             tm_coordinates = []
             for res in self.residues_flat:
                 if res.get("topology","") == "Helical":
