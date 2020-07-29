@@ -3,6 +3,8 @@ Read domains from Uniprot XML into a custom object
 '''
 
 import xml.etree.ElementTree as ET
+import os
+import urllib
 import sys
 import argparse
 import json
