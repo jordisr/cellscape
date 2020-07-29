@@ -19,7 +19,7 @@ def main():
     parser_cartoon.add_argument('--uniprot', help='UniProt XML file to parse for sequence/domain/topology information')
     parser_cartoon.add_argument('--save', default='out', help='Prefix to save graphics')
     parser_cartoon.add_argument('--format', default='svg', help='Format to save graphics', choices=['svg','pdf','png','ps'])
-    parser_cartoon.add_argument('--export', action='store_true', help='Export Python object with structural information')
+    parser_cartoon.add_argument('--export', default=False, action="store_true", help='Export Python object with structural information')
     #parser_cartoon.add_argument('--look', help='Look in directory for structure .pdb, view matrix in .txt and UniProt .xml')
     #parser_cartoon.add_argument('--align', action='store_true', default=False, help='Ignore PDB residue numbering and align to UniProt sequence to find offset')
     parser_cartoon.add_argument('--dpi', type=int, default=300, help='DPI to use if exporting to raster formats (i.e. PNG)')

@@ -3,13 +3,16 @@ Read domains from Uniprot XML into a custom object
 '''
 
 import xml.etree.ElementTree as ET
+import os
+import urllib
 import sys
 import argparse
 import json
 
 class UniprotRecord:
     """Data structure to hold topological/domain information"""
-    def __init__(self,name):
+    def __init__(self, id, name=None):
+        self.id = id
         self.name = name
         self.domains = []
         self.topology = []
@@ -51,29 +54,39 @@ def parse_xml(xmlpath):
     sequences = []
 
     for entry in tree.iter(tag=ns+'entry'):
-        accession = entry.find(ns+'accession')
-        sequence = UniprotRecord(accession.text)
+        accession = entry.find(ns+'accession').text
+        gene = entry.find(ns+'name').text
+        sequence = UniprotRecord(accession, gene)
 
         for feature in entry.iter(tag=ns+'feature'):
 
             # look for transmembrane regions
             if feature.get('type') in ('topological domain','transmembrane region'):
-                begin = feature.find(ns+'location').find(ns+'begin').get('position')
-                end = feature.find(ns+'location').find(ns+'end').get('position')
-                feature_description = feature.get('description').split(';')[0]
-                sequence.add_topology(feature_description, begin, end)
+                try:
+                    begin = feature.find(ns+'location').find(ns+'begin').get('position')
+                    end = feature.find(ns+'location').find(ns+'end').get('position')
+                    feature_description = feature.get('description').split(';')[0]
+                    sequence.add_topology(feature_description, begin, end)
+                except:
+                    pass
 
             # look for protein domains
             elif feature.get('type') == 'domain':
-                begin = feature.find(ns+'location').find(ns+'begin').get('position')
-                end = feature.find(ns+'location').find(ns+'end').get('position')
-                sequence.add_domain(feature.get('description'),begin,end)
+                try:
+                    begin = feature.find(ns+'location').find(ns+'begin').get('position')
+                    end = feature.find(ns+'location').find(ns+'end').get('position')
+                    sequence.add_domain(feature.get('description'),begin,end)
+                except:
+                    pass
 
             # look for signal peptide and mature chain
             elif feature.get('type') in ('chain', 'propeptide','signal peptide'):
-                begin = feature.find(ns+'location').find(ns+'begin').get('position')
-                end = feature.find(ns+'location').find(ns+'end').get('position')
-                sequence.add_ptm(feature.get('type'), begin, end)
+                try:
+                    begin = feature.find(ns+'location').find(ns+'begin').get('position')
+                    end = feature.find(ns+'location').find(ns+'end').get('position')
+                    sequence.add_ptm(feature.get('type'), begin, end)
+                except:
+                    pass
 
         sequence.process_segments()
         sequences.append(sequence)
@@ -83,6 +96,25 @@ def parse_xml(xmlpath):
                 sequence.sequence = seq.text.replace('\n','')
 
     return(sequences)
+
+def split_uniprot_xml(xmlpath, outpath='.'):
+    # take file of multiple uniprot records and split to individual files
+    tree = ET.parse(xmlpath)
+    root = tree.getroot()
+    ns = '{http://uniprot.org/uniprot}'
+    for entry in tree.iter(tag=ns+'entry'):
+        accession = entry.find(ns+'accession')
+        with open("{}/{}.xml".format(outpath, accession.text), "w") as xml_out:
+            xml_out.write(ET.tostring(entry).decode('utf-8'))
+
+def download_uniprot_record(record, fileformat, outdir):
+    file_path = "{}.{}".format(record, fileformat)
+    out_path = "{}/{}".format(outdir, file_path)
+    if not os.path.exists(out_path):
+        print("Requesting {}".format(out_path))
+        urllib.request.urlretrieve("https://www.uniprot.org/uniprot/{}".format(file_path), out_path)
+    else:
+        print("File already there")
 
 if __name__ == "__main__":
 
