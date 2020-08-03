@@ -485,8 +485,10 @@ class Cartoon:
         # default radius for rendering atoms
         if only_ca and radius is None:
             radius_ = 5
-        else:
+        elif radius is None:
             radius_ = 1.5
+        else:
+            radius_ = radius
 
         if by == 'all':
             # space-filling outline of entire molecule
@@ -630,7 +632,8 @@ class Cartoon:
         self._axes= axs
 
         # color schemes
-        default_color = '#D3D3D3'
+        #default_color = '#D3D3D3'
+        default_color = 'tab:blue'
         default_cmap = 'Set1'
         named_colors = [*mcolors.BASE_COLORS.keys(), *mcolors.TABLEAU_COLORS.keys(), *mcolors.CSS4_COLORS.keys(), *mcolors.XKCD_COLORS.keys()]
 
