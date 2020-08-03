@@ -102,6 +102,10 @@ def make_scene(args):
     object_list = []
     num_files = 0
 
+    # set random seed for reproducibility
+    if args.seed:
+        np.random.seed(args.seed)
+
     if args.files:
         for path in args.files:
             with open(path,'rb') as f:
@@ -189,6 +193,8 @@ def make_scene(args):
         if len(args.recolor_cmap) == 1:
             cmap = cm.get_cmap(args.recolor_cmap[0])
         else:
+            # TESTING interpret as continous color scheme
+            # cmap = LinearSegmentedColormap.from_list("cmap", args.recolor_cmap)
             cmap = ListedColormap(args.recolor_cmap)
         color_scheme = dict()
         for i,c in enumerate(object_list):
@@ -197,6 +203,10 @@ def make_scene(args):
                 color_scheme[name] = cmap(i)
             else:
                 color_scheme[name] = cmap(i/len(object_list))
+
+    # TESTING
+    # so colors are by height (what about duplicated molecules)
+    # np.random.shuffle(object_list)
 
     if args.membrane is not None:
         total_width = np.sum([o['width'] for o in object_list])+len(object_list)*args.padding
@@ -225,6 +235,9 @@ def make_scene(args):
                 facecolor = p["facecolor"]
                 edgecolor = p["edgecolor"]
             plot_polygon(p["polygon"], offset=[w, y_offset], facecolor=facecolor, edgecolor=edgecolor, linewidth=p["linewidth"])
+            if args.labels:
+                # option is experimental, text needs to be properly sized and placed
+                plt.text(w+o['width']/2,-100, protein_names[i], rotation=90, fontsize=10)
         w += o['width']+args.padding
 
     if args.background:

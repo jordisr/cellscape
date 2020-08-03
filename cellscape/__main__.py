@@ -51,9 +51,11 @@ def main():
     parser_scene.add_argument('--recolor_cmap', default=['hsv'], nargs='+', help='Named cmap or color scheme for re-coloring')
     # for simulating according to stoichiometry
     parser_scene.add_argument('--csv', help='Table of protein information')
+    parser_scene.add_argument('--seed', type=int, help='Random seed for scene generation')
     parser_scene.add_argument('--sample_from', help='Column to use for sampling', default='stoichiometry')
     parser_scene.add_argument('--num_mol', type=int, help='Total number of molecules in the scene')
     parser_scene.add_argument('--background', action='store_true', default=False, help='Add background plane using same frequencies')
+    parser_scene.add_argument('--labels', action='store_true', default=False, help='') # still testing
 
     # parse arguments and call corresponding command
     args = parser.parse_args()

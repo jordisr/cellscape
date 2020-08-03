@@ -1,0 +1,1459 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<uniprot xmlns="http://uniprot.org/uniprot" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://uniprot.org/uniprot http://www.uniprot.org/support/docs/uniprot.xsd">
+<entry dataset="Swiss-Prot" created="1988-01-01" modified="2020-06-17" version="196">
+<accession>P06731</accession>
+<accession>H9KVA7</accession>
+<name>CEAM5_HUMAN</name>
+<protein>
+<recommendedName>
+<fullName>Carcinoembryonic antigen-related cell adhesion molecule 5</fullName>
+</recommendedName>
+<alternativeName>
+<fullName>Carcinoembryonic antigen</fullName>
+<shortName>CEA</shortName>
+</alternativeName>
+<alternativeName>
+<fullName>Meconium antigen 100</fullName>
+</alternativeName>
+<cdAntigenName>CD66e</cdAntigenName>
+</protein>
+<gene>
+<name type="primary">CEACAM5</name>
+<name type="synonym">CEA</name>
+</gene>
+<organism>
+<name type="scientific">Homo sapiens</name>
+<name type="common">Human</name>
+<dbReference type="NCBI Taxonomy" id="9606"/>
+<lineage>
+<taxon>Eukaryota</taxon>
+<taxon>Metazoa</taxon>
+<taxon>Chordata</taxon>
+<taxon>Craniata</taxon>
+<taxon>Vertebrata</taxon>
+<taxon>Euteleostomi</taxon>
+<taxon>Mammalia</taxon>
+<taxon>Eutheria</taxon>
+<taxon>Euarchontoglires</taxon>
+<taxon>Primates</taxon>
+<taxon>Haplorrhini</taxon>
+<taxon>Catarrhini</taxon>
+<taxon>Hominidae</taxon>
+<taxon>Homo</taxon>
+</lineage>
+</organism>
+<reference key="1">
+<citation type="journal article" date="1987" name="Mol. Cell. Biol." volume="7" first="3221" last="3230">
+<title>Isolation and characterization of full-length functional cDNA clones for human carcinoembryonic antigen.</title>
+<authorList>
+<person name="Beauchemin N."/>
+<person name="Benchimol S."/>
+<person name="Cournoyer D."/>
+<person name="Fuks A."/>
+<person name="Stanners C.P."/>
+</authorList>
+<dbReference type="PubMed" id="3670312"/>
+<dbReference type="DOI" id="10.1128/mcb.7.9.3221"/>
+</citation>
+<scope>NUCLEOTIDE SEQUENCE [GENOMIC DNA]</scope>
+<scope>VARIANT GLU-398</scope>
+</reference>
+<reference key="2">
+<citation type="journal article" date="1988" name="Genomics" volume="3" first="59" last="66">
+<title>Carcinoembryonic antigen family: characterization of cDNAs coding for NCA and CEA and suggestion of nonrandom sequence variation in their conserved loop-domains.</title>
+<authorList>
+<person name="Barnett T."/>
+<person name="Goebel S.J."/>
+<person name="Nothdurft M.A."/>
+<person name="Elting J.J."/>
+</authorList>
+<dbReference type="PubMed" id="3220478"/>
+<dbReference type="DOI" id="10.1016/0888-7543(88)90160-7"/>
+</citation>
+<scope>NUCLEOTIDE SEQUENCE [MRNA] (ISOFORM 1)</scope>
+<scope>VARIANT GLU-398</scope>
+</reference>
+<reference key="3">
+<citation type="journal article" date="1990" name="Mol. Cell. Biol." volume="10" first="2738" last="2748">
+<title>Cloning of the complete gene for carcinoembryonic antigen: analysis of its promoter indicates a region conveying cell type-specific expression.</title>
+<authorList>
+<person name="Schrewe H."/>
+<person name="Thompson J."/>
+<person name="Bona M."/>
+<person name="Hefta L.J.F."/>
+<person name="Maruya A."/>
+<person name="Hassauer M."/>
+<person name="Shively J.E."/>
+<person name="von Kleist S."/>
+<person name="Zimmermann W."/>
+</authorList>
+<dbReference type="PubMed" id="2342461"/>
+<dbReference type="DOI" id="10.1128/mcb.10.6.2738"/>
+</citation>
+<scope>NUCLEOTIDE SEQUENCE [GENOMIC DNA]</scope>
+<scope>VARIANT GLU-398</scope>
+</reference>
+<reference key="4">
+<citation type="journal article" date="2004" name="Nature" volume="428" first="529" last="535">
+<title>The DNA sequence and biology of human chromosome 19.</title>
+<authorList>
+<person name="Grimwood J."/>
+<person name="Gordon L.A."/>
+<person name="Olsen A.S."/>
+<person name="Terry A."/>
+<person name="Schmutz J."/>
+<person name="Lamerdin J.E."/>
+<person name="Hellsten U."/>
+<person name="Goodstein D."/>
+<person name="Couronne O."/>
+<person name="Tran-Gyamfi M."/>
+<person name="Aerts A."/>
+<person name="Altherr M."/>
+<person name="Ashworth L."/>
+<person name="Bajorek E."/>
+<person name="Black S."/>
+<person name="Branscomb E."/>
+<person name="Caenepeel S."/>
+<person name="Carrano A.V."/>
+<person name="Caoile C."/>
+<person name="Chan Y.M."/>
+<person name="Christensen M."/>
+<person name="Cleland C.A."/>
+<person name="Copeland A."/>
+<person name="Dalin E."/>
+<person name="Dehal P."/>
+<person name="Denys M."/>
+<person name="Detter J.C."/>
+<person name="Escobar J."/>
+<person name="Flowers D."/>
+<person name="Fotopulos D."/>
+<person name="Garcia C."/>
+<person name="Georgescu A.M."/>
+<person name="Glavina T."/>
+<person name="Gomez M."/>
+<person name="Gonzales E."/>
+<person name="Groza M."/>
+<person name="Hammon N."/>
+<person name="Hawkins T."/>
+<person name="Haydu L."/>
+<person name="Ho I."/>
+<person name="Huang W."/>
+<person name="Israni S."/>
+<person name="Jett J."/>
+<person name="Kadner K."/>
+<person name="Kimball H."/>
+<person name="Kobayashi A."/>
+<person name="Larionov V."/>
+<person name="Leem S.-H."/>
+<person name="Lopez F."/>
+<person name="Lou Y."/>
+<person name="Lowry S."/>
+<person name="Malfatti S."/>
+<person name="Martinez D."/>
+<person name="McCready P.M."/>
+<person name="Medina C."/>
+<person name="Morgan J."/>
+<person name="Nelson K."/>
+<person name="Nolan M."/>
+<person name="Ovcharenko I."/>
+<person name="Pitluck S."/>
+<person name="Pollard M."/>
+<person name="Popkie A.P."/>
+<person name="Predki P."/>
+<person name="Quan G."/>
+<person name="Ramirez L."/>
+<person name="Rash S."/>
+<person name="Retterer J."/>
+<person name="Rodriguez A."/>
+<person name="Rogers S."/>
+<person name="Salamov A."/>
+<person name="Salazar A."/>
+<person name="She X."/>
+<person name="Smith D."/>
+<person name="Slezak T."/>
+<person name="Solovyev V."/>
+<person name="Thayer N."/>
+<person name="Tice H."/>
+<person name="Tsai M."/>
+<person name="Ustaszewska A."/>
+<person name="Vo N."/>
+<person name="Wagner M."/>
+<person name="Wheeler J."/>
+<person name="Wu K."/>
+<person name="Xie G."/>
+<person name="Yang J."/>
+<person name="Dubchak I."/>
+<person name="Furey T.S."/>
+<person name="DeJong P."/>
+<person name="Dickson M."/>
+<person name="Gordon D."/>
+<person name="Eichler E.E."/>
+<person name="Pennacchio L.A."/>
+<person name="Richardson P."/>
+<person name="Stubbs L."/>
+<person name="Rokhsar D.S."/>
+<person name="Myers R.M."/>
+<person name="Rubin E.M."/>
+<person name="Lucas S.M."/>
+</authorList>
+<dbReference type="PubMed" id="15057824"/>
+<dbReference type="DOI" id="10.1038/nature02399"/>
+</citation>
+<scope>NUCLEOTIDE SEQUENCE [LARGE SCALE GENOMIC DNA]</scope>
+</reference>
+<reference key="5">
+<citation type="journal article" date="1987" name="Biochem. Biophys. Res. Commun." volume="142" first="511" last="518">
+<title>Primary structure of human carcinoembryonic antigen (CEA) deduced from cDNA sequence.</title>
+<authorList>
+<person name="Oikawa S."/>
+<person name="Nakazato H."/>
+<person name="Kosaki G."/>
+</authorList>
+<dbReference type="PubMed" id="3814146"/>
+<dbReference type="DOI" id="10.1016/0006-291x(87)90304-4"/>
+</citation>
+<scope>NUCLEOTIDE SEQUENCE [MRNA] OF 5-702 (ISOFORM 2)</scope>
+<scope>VARIANT GLU-398</scope>
+</reference>
+<reference key="6">
+<citation type="journal article" date="1987" name="Proc. Natl. Acad. Sci. U.S.A." volume="84" first="2960" last="2964">
+<title>Isolation and characterization of cDNA clones encoding the human carcinoembryonic antigen reveal a highly conserved repeating structure.</title>
+<authorList>
+<person name="Zimmermann W."/>
+<person name="Ortlieb B."/>
+<person name="Friedrich R."/>
+<person name="von Kleist S."/>
+</authorList>
+<dbReference type="PubMed" id="3033671"/>
+<dbReference type="DOI" id="10.1073/pnas.84.9.2960"/>
+</citation>
+<scope>NUCLEOTIDE SEQUENCE [MRNA] OF 331-702 (ISOFORM 1)</scope>
+<scope>VARIANT GLU-398</scope>
+</reference>
+<reference key="7">
+<citation type="journal article" date="1989" name="Biochem. Biophys. Res. Commun." volume="164" first="39" last="45">
+<title>Cell adhesion activity of non-specific cross-reacting antigen (NCA) and carcinoembryonic antigen (CEA) expressed on CHO cell surface: homophilic and heterophilic adhesion.</title>
+<authorList>
+<person name="Oikawa S."/>
+<person name="Inuzuka C."/>
+<person name="Kuroki M."/>
+<person name="Matsuoka Y."/>
+<person name="Kosaki G."/>
+<person name="Nakazato H."/>
+</authorList>
+<dbReference type="PubMed" id="2803308"/>
+<dbReference type="DOI" id="10.1016/0006-291x(89)91679-3"/>
+</citation>
+<scope>FUNCTION</scope>
+<scope>SUBCELLULAR LOCATION</scope>
+</reference>
+<reference key="8">
+<citation type="journal article" date="1990" name="Cancer Res." volume="50" first="2397" last="2403">
+<title>Expression of complementary DNA and genomic clones for carcinoembryonic antigen and nonspecific cross-reacting antigen in Chinese hamster ovary and mouse fibroblast cells and characterization of the membrane-expressed products.</title>
+<authorList>
+<person name="Hefta L.J."/>
+<person name="Schrewe H."/>
+<person name="Thompson J.A."/>
+<person name="Oikawa S."/>
+<person name="Nakazato H."/>
+<person name="Shively J.E."/>
+</authorList>
+<dbReference type="PubMed" id="2317824"/>
+</citation>
+<scope>SUBCELLULAR LOCATION</scope>
+<scope>GPI-ANCHOR AT ALA-685</scope>
+</reference>
+<reference key="9">
+<citation type="journal article" date="1999" name="Tumor Biol." volume="20" first="277" last="292">
+<title>Four carcinoembryonic antigen subfamily members, CEA, NCA, BGP and CGM2, selectively expressed in the normal human colonic epithelium, are integral components of the fuzzy coat.</title>
+<authorList>
+<person name="Fraengsmyr L."/>
+<person name="Baranov V."/>
+<person name="Hammarstroem S."/>
+</authorList>
+<dbReference type="PubMed" id="10436421"/>
+<dbReference type="DOI" id="10.1159/000030075"/>
+</citation>
+<scope>SUBCELLULAR LOCATION</scope>
+<scope>TISSUE SPECIFICITY</scope>
+</reference>
+<reference key="10">
+<citation type="journal article" date="2000" name="Cancer Res." volume="60" first="3419" last="3424">
+<title>Human carcinoembryonic antigen functions as a general inhibitor of anoikis.</title>
+<authorList>
+<person name="Ordonez C."/>
+<person name="Screaton R.A."/>
+<person name="Ilantzis C."/>
+<person name="Stanners C.P."/>
+</authorList>
+<dbReference type="PubMed" id="10910050"/>
+</citation>
+<scope>FUNCTION</scope>
+</reference>
+<reference key="11">
+<citation type="journal article" date="2000" name="J. Biol. Chem." volume="275" first="26935" last="26943">
+<title>Self recognition in the Ig superfamily. Identification of precise subdomains in carcinoembryonic antigen required for intercellular adhesion.</title>
+<authorList>
+<person name="Taheri M."/>
+<person name="Saragovi U."/>
+<person name="Fuks A."/>
+<person name="Makkerh J."/>
+<person name="Mort J."/>
+<person name="Stanners C.P."/>
+</authorList>
+<dbReference type="PubMed" id="10864933"/>
+<dbReference type="DOI" id="10.1074/jbc.m909242199"/>
+</citation>
+<scope>FUNCTION</scope>
+<scope>MUTAGENESIS OF SER-66; TYR-68; LYS-69 AND GLN-78</scope>
+<scope>SUBCELLULAR LOCATION</scope>
+</reference>
+<reference key="12">
+<citation type="journal article" date="2006" name="J. Proteome Res." volume="5" first="1493" last="1503">
+<title>Identification of N-linked glycoproteins in human saliva by glycoprotein capture and mass spectrometry.</title>
+<authorList>
+<person name="Ramachandran P."/>
+<person name="Boontheung P."/>
+<person name="Xie Y."/>
+<person name="Sondej M."/>
+<person name="Wong D.T."/>
+<person name="Loo J.A."/>
+</authorList>
+<dbReference type="PubMed" id="16740002"/>
+<dbReference type="DOI" id="10.1021/pr050492k"/>
+</citation>
+<scope>GLYCOSYLATION [LARGE SCALE ANALYSIS] AT ASN-560</scope>
+<source>
+<tissue>Saliva</tissue>
+</source>
+</reference>
+<reference key="13">
+<citation type="journal article" date="2009" name="J. Proteome Res." volume="8" first="651" last="661">
+<title>Glycoproteomics analysis of human liver tissue by combination of multiple enzyme digestion and hydrazide chemistry.</title>
+<authorList>
+<person name="Chen R."/>
+<person name="Jiang X."/>
+<person name="Sun D."/>
+<person name="Han G."/>
+<person name="Wang F."/>
+<person name="Ye M."/>
+<person name="Wang L."/>
+<person name="Zou H."/>
+</authorList>
+<dbReference type="PubMed" id="19159218"/>
+<dbReference type="DOI" id="10.1021/pr8008012"/>
+</citation>
+<scope>GLYCOSYLATION [LARGE SCALE ANALYSIS] AT ASN-246</scope>
+<source>
+<tissue>Liver</tissue>
+</source>
+</reference>
+<reference key="14">
+<citation type="journal article" date="2015" name="Proc. Natl. Acad. Sci. U.S.A." volume="112" first="13561" last="13566">
+<title>Diverse oligomeric states of CEACAM IgV domains.</title>
+<authorList>
+<person name="Bonsor D.A."/>
+<person name="Gunther S."/>
+<person name="Beadenkopf R."/>
+<person name="Beckett D."/>
+<person name="Sundberg E.J."/>
+</authorList>
+<dbReference type="PubMed" id="26483485"/>
+<dbReference type="DOI" id="10.1073/pnas.1509511112"/>
+</citation>
+<scope>SUBUNIT</scope>
+</reference>
+<reference key="15">
+<citation type="journal article" date="2000" name="FEBS Lett." volume="475" first="11" last="16">
+<title>Structural models for carcinoembryonic antigen and its complex with the single-chain Fv antibody molecule MFE23.</title>
+<authorList>
+<person name="Boehm M.K."/>
+<person name="Perkins S.J."/>
+</authorList>
+<dbReference type="PubMed" id="10854848"/>
+<dbReference type="DOI" id="10.1016/s0014-5793(00)01612-4"/>
+</citation>
+<scope>3D-STRUCTURE MODELING OF 35-676</scope>
+</reference>
+<reference key="16">
+<citation type="journal article" date="2008" name="Mol. Microbiol." volume="67" first="420" last="434">
+<title>Binding of Dr adhesins of Escherichia coli to carcinoembryonic antigen triggers receptor dissociation.</title>
+<authorList>
+<person name="Korotkova N."/>
+<person name="Yang Y."/>
+<person name="Le Trong I."/>
+<person name="Cota E."/>
+<person name="Demeler B."/>
+<person name="Marchant J."/>
+<person name="Thomas W.E."/>
+<person name="Stenkamp R.E."/>
+<person name="Moseley S.L."/>
+<person name="Matthews S."/>
+</authorList>
+<dbReference type="PubMed" id="18086185"/>
+<dbReference type="DOI" id="10.1111/j.1365-2958.2007.06054.x"/>
+</citation>
+<scope>X-RAY CRYSTALLOGRAPHY (1.95 ANGSTROMS) OF 34-144 IN COMPLEX WITH E.COLI DR ADHESIN</scope>
+<scope>FUNCTION (MICROBIAL INFECTION)</scope>
+<scope>SUBUNIT</scope>
+<scope>SUBCELLULAR LOCATION</scope>
+<scope>MUTAGENESIS OF PHE-63; SER-66; VAL-73; ASP-74; GLN-78; ILE-125; LEU-129 AND GLU-133</scope>
+</reference>
+<comment type="function">
+<text evidence="7 8 15">Cell surface glycoprotein that plays a role in cell adhesion, intracellular signaling and tumor progression (PubMed:2803308, PubMed:10910050, PubMed:10864933). Mediates homophilic and heterophilic cell adhesion with other carcinoembryonic antigen-related cell adhesion molecules, such as CEACAM6 (PubMed:2803308). Plays a role as an oncogene by promoting tumor progression; induces resistance to anoikis of colorectal carcinoma cells (PubMed:10910050).</text>
+</comment>
+<comment type="function">
+<text evidence="10">(Microbial infection) Receptor for E.coli Dr adhesins. Binding of E.coli Dr adhesins leads to dissociation of the homodimer.</text>
+</comment>
+<comment type="subunit">
+<text evidence="10 14">Homodimer.</text>
+</comment>
+<comment type="interaction">
+<interactant intactId="EBI-3914938">
+<id>P06731</id>
+</interactant>
+<interactant intactId="EBI-3914938">
+<id>P06731</id>
+<label>CEACAM5</label>
+</interactant>
+<organismsDiffer>false</organismsDiffer>
+<experiments>6</experiments>
+</comment>
+<comment type="interaction">
+<interactant intactId="EBI-3914938">
+<id>P06731</id>
+</interactant>
+<interactant intactId="EBI-16040613">
+<id>K0BRG7</id>
+<label>S</label>
+</interactant>
+<organismsDiffer>true</organismsDiffer>
+<experiments>4</experiments>
+</comment>
+<comment type="subcellular location">
+<subcellularLocation>
+<location evidence="7 10 12">Cell membrane</location>
+<topology evidence="7 10 12">Lipid-anchor</topology>
+<topology evidence="7 10 12">GPI-anchor</topology>
+</subcellularLocation>
+<subcellularLocation>
+<location evidence="6">Apical cell membrane</location>
+</subcellularLocation>
+<subcellularLocation>
+<location evidence="12 15">Cell surface</location>
+</subcellularLocation>
+<text evidence="6">Localized to the apical glycocalyx surface.</text>
+</comment>
+<comment type="alternative products">
+<event type="alternative splicing"/>
+<isoform>
+<id>P06731-1</id>
+<name>1</name>
+<sequence type="displayed"/>
+</isoform>
+<isoform>
+<id>P06731-2</id>
+<name>2</name>
+<sequence type="described" ref="VSP_053414"/>
+</isoform>
+</comment>
+<comment type="tissue specificity">
+<text evidence="6">Expressed in columnar epithelial and goblet cells of the colon (at protein level) (PubMed:10436421). Found in adenocarcinomas of endodermally derived digestive system epithelium and fetal colon.</text>
+</comment>
+<comment type="PTM">
+<text>Complex immunoreactive glycoprotein with a MW of 180 kDa comprising 60% carbohydrate.</text>
+</comment>
+<comment type="similarity">
+<text evidence="21">Belongs to the immunoglobulin superfamily. CEA family.</text>
+</comment>
+<comment type="sequence caution" evidence="21">
+<conflict type="frameshift">
+<sequence resource="EMBL-CDS" id="AAA62835" version="1"/>
+</conflict>
+</comment>
+<dbReference type="EMBL" id="M17303">
+<property type="protein sequence ID" value="AAB59513.1"/>
+<property type="molecule type" value="Genomic_DNA"/>
+</dbReference>
+<dbReference type="EMBL" id="M29540">
+<property type="protein sequence ID" value="AAA51967.1"/>
+<property type="molecule type" value="mRNA"/>
+</dbReference>
+<dbReference type="EMBL" id="M59262">
+<property type="protein sequence ID" value="AAA62835.1"/>
+<property type="status" value="ALT_FRAME"/>
+<property type="molecule type" value="Genomic_DNA"/>
+</dbReference>
+<dbReference type="EMBL" id="M59255">
+<property type="protein sequence ID" value="AAA62835.1"/>
+<property type="status" value="JOINED"/>
+<property type="molecule type" value="Genomic_DNA"/>
+</dbReference>
+<dbReference type="EMBL" id="M59256">
+<property type="protein sequence ID" value="AAA62835.1"/>
+<property type="status" value="JOINED"/>
+<property type="molecule type" value="Genomic_DNA"/>
+</dbReference>
+<dbReference type="EMBL" id="M59257">
+<property type="protein sequence ID" value="AAA62835.1"/>
+<property type="status" value="JOINED"/>
+<property type="molecule type" value="Genomic_DNA"/>
+</dbReference>
+<dbReference type="EMBL" id="M59258">
+<property type="protein sequence ID" value="AAA62835.1"/>
+<property type="status" value="JOINED"/>
+<property type="molecule type" value="Genomic_DNA"/>
+</dbReference>
+<dbReference type="EMBL" id="M59259">
+<property type="protein sequence ID" value="AAA62835.1"/>
+<property type="status" value="JOINED"/>
+<property type="molecule type" value="Genomic_DNA"/>
+</dbReference>
+<dbReference type="EMBL" id="M59260">
+<property type="protein sequence ID" value="AAA62835.1"/>
+<property type="status" value="JOINED"/>
+<property type="molecule type" value="Genomic_DNA"/>
+</dbReference>
+<dbReference type="EMBL" id="M59261">
+<property type="protein sequence ID" value="AAA62835.1"/>
+<property type="status" value="JOINED"/>
+<property type="molecule type" value="Genomic_DNA"/>
+</dbReference>
+<dbReference type="EMBL" id="M59709">
+<property type="status" value="NOT_ANNOTATED_CDS"/>
+<property type="molecule type" value="Genomic_DNA"/>
+</dbReference>
+<dbReference type="EMBL" id="M59710">
+<property type="status" value="NOT_ANNOTATED_CDS"/>
+<property type="molecule type" value="Genomic_DNA"/>
+</dbReference>
+<dbReference type="EMBL" id="AC008999">
+<property type="status" value="NOT_ANNOTATED_CDS"/>
+<property type="molecule type" value="Genomic_DNA"/>
+</dbReference>
+<dbReference type="EMBL" id="X16455">
+<property type="protein sequence ID" value="CAA34474.1"/>
+<property type="molecule type" value="mRNA"/>
+</dbReference>
+<dbReference type="EMBL" id="M15042">
+<property type="protein sequence ID" value="AAA51963.1"/>
+<property type="molecule type" value="mRNA"/>
+</dbReference>
+<dbReference type="EMBL" id="M16234">
+<property type="protein sequence ID" value="AAA51972.1"/>
+<property type="molecule type" value="mRNA"/>
+</dbReference>
+<dbReference type="CCDS" id="CCDS12584.1">
+<molecule id="P06731-1"/>
+</dbReference>
+<dbReference type="CCDS" id="CCDS77302.1">
+<molecule id="P06731-2"/>
+</dbReference>
+<dbReference type="PIR" id="A36319">
+<property type="entry name" value="A36319"/>
+</dbReference>
+<dbReference type="RefSeq" id="NP_001278413.1">
+<property type="nucleotide sequence ID" value="NM_001291484.2"/>
+</dbReference>
+<dbReference type="RefSeq" id="NP_001295327.1">
+<property type="nucleotide sequence ID" value="NM_001308398.1"/>
+</dbReference>
+<dbReference type="RefSeq" id="NP_004354.3">
+<property type="nucleotide sequence ID" value="NM_004363.5"/>
+</dbReference>
+<dbReference type="PDB" id="1E07">
+<property type="method" value="X-ray"/>
+<property type="chains" value="A=35-676"/>
+</dbReference>
+<dbReference type="PDB" id="2QSQ">
+<property type="method" value="X-ray"/>
+<property type="resolution" value="1.95"/>
+<property type="chains" value="A/B=34-144"/>
+</dbReference>
+<dbReference type="PDB" id="2QST">
+<property type="method" value="X-ray"/>
+<property type="resolution" value="2.90"/>
+<property type="chains" value="A/B=34-144"/>
+</dbReference>
+<dbReference type="PDB" id="2VER">
+<property type="method" value="NMR"/>
+<property type="chains" value="N=35-144"/>
+</dbReference>
+<dbReference type="PDBsum" id="1E07"/>
+<dbReference type="PDBsum" id="2QSQ"/>
+<dbReference type="PDBsum" id="2QST"/>
+<dbReference type="PDBsum" id="2VER"/>
+<dbReference type="SMR" id="P06731"/>
+<dbReference type="BioGRID" id="107478">
+<property type="interactions" value="7"/>
+</dbReference>
+<dbReference type="DIP" id="DIP-57769N"/>
+<dbReference type="IntAct" id="P06731">
+<property type="interactions" value="8"/>
+</dbReference>
+<dbReference type="MINT" id="P06731"/>
+<dbReference type="STRING" id="9606.ENSP00000221992"/>
+<dbReference type="ChEMBL" id="CHEMBL3712881"/>
+<dbReference type="DrugBank" id="DB05097">
+<property type="generic name" value="Labetuzumab"/>
+</dbReference>
+<dbReference type="DrugBank" id="DB08217">
+<property type="generic name" value="S-[(1-Hydroxy-2,2,5,5-tetramethyl-2,5-dihydro-1H-pyrrol-3-yl)methyl] methanesulfonothioate"/>
+</dbReference>
+<dbReference type="GlyConnect" id="1070"/>
+<dbReference type="GlyConnect" id="1071"/>
+<dbReference type="iPTMnet" id="P06731"/>
+<dbReference type="PhosphoSitePlus" id="P06731"/>
+<dbReference type="BioMuta" id="CEACAM5"/>
+<dbReference type="DMDM" id="317373456"/>
+<dbReference type="jPOST" id="P06731"/>
+<dbReference type="MassIVE" id="P06731"/>
+<dbReference type="MaxQB" id="P06731"/>
+<dbReference type="PaxDb" id="P06731"/>
+<dbReference type="PeptideAtlas" id="P06731"/>
+<dbReference type="PRIDE" id="P06731"/>
+<dbReference type="ProteomicsDB" id="46254"/>
+<dbReference type="ProteomicsDB" id="51917">
+<molecule id="P06731-1"/>
+</dbReference>
+<dbReference type="ABCD" id="P06731">
+<property type="antibodies" value="39 sequenced antibodies"/>
+</dbReference>
+<dbReference type="Antibodypedia" id="3500">
+<property type="antibodies" value="3158 antibodies"/>
+</dbReference>
+<dbReference type="DNASU" id="1048"/>
+<dbReference type="Ensembl" id="ENST00000221992">
+<property type="protein sequence ID" value="ENSP00000221992"/>
+<property type="gene ID" value="ENSG00000105388"/>
+</dbReference>
+<dbReference type="Ensembl" id="ENST00000398599">
+<property type="protein sequence ID" value="ENSP00000381600"/>
+<property type="gene ID" value="ENSG00000105388"/>
+</dbReference>
+<dbReference type="Ensembl" id="ENST00000405816">
+<property type="protein sequence ID" value="ENSP00000385072"/>
+<property type="gene ID" value="ENSG00000105388"/>
+</dbReference>
+<dbReference type="GeneID" id="1048"/>
+<dbReference type="KEGG" id="hsa:1048"/>
+<dbReference type="UCSC" id="uc002orj.2">
+<molecule id="P06731-1"/>
+<property type="organism name" value="human"/>
+</dbReference>
+<dbReference type="CTD" id="1048"/>
+<dbReference type="DisGeNET" id="1048"/>
+<dbReference type="EuPathDB" id="HostDB:ENSG00000105388.15"/>
+<dbReference type="GeneCards" id="CEACAM5"/>
+<dbReference type="HGNC" id="HGNC:1817">
+<property type="gene designation" value="CEACAM5"/>
+</dbReference>
+<dbReference type="HPA" id="ENSG00000105388">
+<property type="expression patterns" value="Tissue enhanced (esophagus, intestine, lymphoid tissue)"/>
+</dbReference>
+<dbReference type="MIM" id="114890">
+<property type="type" value="gene"/>
+</dbReference>
+<dbReference type="neXtProt" id="NX_P06731"/>
+<dbReference type="PharmGKB" id="PA26361"/>
+<dbReference type="eggNOG" id="ENOG410IFE1">
+<property type="taxonomic scope" value="Eukaryota"/>
+</dbReference>
+<dbReference type="eggNOG" id="ENOG410YR1P">
+<property type="taxonomic scope" value="LUCA"/>
+</dbReference>
+<dbReference type="HOGENOM" id="CLU_024555_7_0_1"/>
+<dbReference type="InParanoid" id="P06731"/>
+<dbReference type="KO" id="K06499"/>
+<dbReference type="OrthoDB" id="998214at2759"/>
+<dbReference type="PhylomeDB" id="P06731"/>
+<dbReference type="TreeFam" id="TF336859"/>
+<dbReference type="Reactome" id="R-HSA-163125">
+<property type="pathway name" value="Post-translational modification: synthesis of GPI-anchored proteins"/>
+</dbReference>
+<dbReference type="Reactome" id="R-HSA-202733">
+<property type="pathway name" value="Cell surface interactions at the vascular wall"/>
+</dbReference>
+<dbReference type="BioGRID-ORCS" id="1048">
+<property type="hits" value="13 hits in 786 CRISPR screens"/>
+</dbReference>
+<dbReference type="ChiTaRS" id="CEACAM5">
+<property type="organism name" value="human"/>
+</dbReference>
+<dbReference type="EvolutionaryTrace" id="P06731"/>
+<dbReference type="GeneWiki" id="CEACAM5"/>
+<dbReference type="GenomeRNAi" id="1048"/>
+<dbReference type="Pharos" id="P06731">
+<property type="development level" value="Tbio"/>
+</dbReference>
+<dbReference type="PRO" id="PR:P06731"/>
+<dbReference type="Proteomes" id="UP000005640">
+<property type="component" value="Chromosome 19"/>
+</dbReference>
+<dbReference type="RNAct" id="P06731">
+<property type="molecule type" value="protein"/>
+</dbReference>
+<dbReference type="Bgee" id="ENSG00000105388">
+<property type="expression patterns" value="Expressed in colonic mucosa and 130 other tissues"/>
+</dbReference>
+<dbReference type="ExpressionAtlas" id="P06731">
+<property type="expression patterns" value="baseline and differential"/>
+</dbReference>
+<dbReference type="Genevisible" id="P06731">
+<property type="organism ID" value="HS"/>
+</dbReference>
+<dbReference type="GO" id="GO:0031225">
+<property type="term" value="C:anchored component of membrane"/>
+<property type="evidence" value="ECO:0000314"/>
+<property type="project" value="UniProtKB"/>
+</dbReference>
+<dbReference type="GO" id="GO:0016324">
+<property type="term" value="C:apical plasma membrane"/>
+<property type="evidence" value="ECO:0000314"/>
+<property type="project" value="UniProtKB"/>
+</dbReference>
+<dbReference type="GO" id="GO:0016323">
+<property type="term" value="C:basolateral plasma membrane"/>
+<property type="evidence" value="ECO:0000314"/>
+<property type="project" value="UniProtKB"/>
+</dbReference>
+<dbReference type="GO" id="GO:0009986">
+<property type="term" value="C:cell surface"/>
+<property type="evidence" value="ECO:0000314"/>
+<property type="project" value="UniProtKB"/>
+</dbReference>
+<dbReference type="GO" id="GO:0070062">
+<property type="term" value="C:extracellular exosome"/>
+<property type="evidence" value="ECO:0007005"/>
+<property type="project" value="UniProtKB"/>
+</dbReference>
+<dbReference type="GO" id="GO:0005576">
+<property type="term" value="C:extracellular region"/>
+<property type="evidence" value="ECO:0000304"/>
+<property type="project" value="Reactome"/>
+</dbReference>
+<dbReference type="GO" id="GO:0071575">
+<property type="term" value="C:integral component of external side of plasma membrane"/>
+<property type="evidence" value="ECO:0000314"/>
+<property type="project" value="UniProtKB"/>
+</dbReference>
+<dbReference type="GO" id="GO:0005887">
+<property type="term" value="C:integral component of plasma membrane"/>
+<property type="evidence" value="ECO:0000314"/>
+<property type="project" value="UniProtKB"/>
+</dbReference>
+<dbReference type="GO" id="GO:0005886">
+<property type="term" value="C:plasma membrane"/>
+<property type="evidence" value="ECO:0000314"/>
+<property type="project" value="HPA"/>
+</dbReference>
+<dbReference type="GO" id="GO:0034235">
+<property type="term" value="F:GPI anchor binding"/>
+<property type="evidence" value="ECO:0000315"/>
+<property type="project" value="UniProtKB"/>
+</dbReference>
+<dbReference type="GO" id="GO:0042802">
+<property type="term" value="F:identical protein binding"/>
+<property type="evidence" value="ECO:0000314"/>
+<property type="project" value="UniProtKB"/>
+</dbReference>
+<dbReference type="GO" id="GO:0042803">
+<property type="term" value="F:protein homodimerization activity"/>
+<property type="evidence" value="ECO:0000314"/>
+<property type="project" value="UniProtKB"/>
+</dbReference>
+<dbReference type="GO" id="GO:0006915">
+<property type="term" value="P:apoptotic process"/>
+<property type="evidence" value="ECO:0000501"/>
+<property type="project" value="UniProtKB-KW"/>
+</dbReference>
+<dbReference type="GO" id="GO:0007157">
+<property type="term" value="P:heterophilic cell-cell adhesion via plasma membrane cell adhesion molecules"/>
+<property type="evidence" value="ECO:0000315"/>
+<property type="project" value="UniProtKB"/>
+</dbReference>
+<dbReference type="GO" id="GO:0007156">
+<property type="term" value="P:homophilic cell adhesion via plasma membrane adhesion molecules"/>
+<property type="evidence" value="ECO:0000315"/>
+<property type="project" value="UniProtKB"/>
+</dbReference>
+<dbReference type="GO" id="GO:0034109">
+<property type="term" value="P:homotypic cell-cell adhesion"/>
+<property type="evidence" value="ECO:0000314"/>
+<property type="project" value="UniProtKB"/>
+</dbReference>
+<dbReference type="GO" id="GO:0050900">
+<property type="term" value="P:leukocyte migration"/>
+<property type="evidence" value="ECO:0000304"/>
+<property type="project" value="Reactome"/>
+</dbReference>
+<dbReference type="GO" id="GO:2000811">
+<property type="term" value="P:negative regulation of anoikis"/>
+<property type="evidence" value="ECO:0000314"/>
+<property type="project" value="UniProtKB"/>
+</dbReference>
+<dbReference type="GO" id="GO:0043066">
+<property type="term" value="P:negative regulation of apoptotic process"/>
+<property type="evidence" value="ECO:0000314"/>
+<property type="project" value="UniProtKB"/>
+</dbReference>
+<dbReference type="GO" id="GO:0010832">
+<property type="term" value="P:negative regulation of myotube differentiation"/>
+<property type="evidence" value="ECO:0000314"/>
+<property type="project" value="UniProtKB"/>
+</dbReference>
+<dbReference type="Gene3D" id="2.60.40.10">
+<property type="match status" value="7"/>
+</dbReference>
+<dbReference type="InterPro" id="IPR007110">
+<property type="entry name" value="Ig-like_dom"/>
+</dbReference>
+<dbReference type="InterPro" id="IPR036179">
+<property type="entry name" value="Ig-like_dom_sf"/>
+</dbReference>
+<dbReference type="InterPro" id="IPR013783">
+<property type="entry name" value="Ig-like_fold"/>
+</dbReference>
+<dbReference type="InterPro" id="IPR003599">
+<property type="entry name" value="Ig_sub"/>
+</dbReference>
+<dbReference type="InterPro" id="IPR003598">
+<property type="entry name" value="Ig_sub2"/>
+</dbReference>
+<dbReference type="InterPro" id="IPR013106">
+<property type="entry name" value="Ig_V-set"/>
+</dbReference>
+<dbReference type="Pfam" id="PF13895">
+<property type="entry name" value="Ig_2"/>
+<property type="match status" value="3"/>
+</dbReference>
+<dbReference type="Pfam" id="PF07686">
+<property type="entry name" value="V-set"/>
+<property type="match status" value="1"/>
+</dbReference>
+<dbReference type="SMART" id="SM00409">
+<property type="entry name" value="IG"/>
+<property type="match status" value="7"/>
+</dbReference>
+<dbReference type="SMART" id="SM00408">
+<property type="entry name" value="IGc2"/>
+<property type="match status" value="6"/>
+</dbReference>
+<dbReference type="SUPFAM" id="SSF48726">
+<property type="entry name" value="SSF48726"/>
+<property type="match status" value="7"/>
+</dbReference>
+<dbReference type="PROSITE" id="PS50835">
+<property type="entry name" value="IG_LIKE"/>
+<property type="match status" value="6"/>
+</dbReference>
+<proteinExistence type="evidence at protein level"/>
+<keyword id="KW-0002">3D-structure</keyword>
+<keyword id="KW-0025">Alternative splicing</keyword>
+<keyword id="KW-0053">Apoptosis</keyword>
+<keyword id="KW-0130">Cell adhesion</keyword>
+<keyword id="KW-1003">Cell membrane</keyword>
+<keyword id="KW-1015">Disulfide bond</keyword>
+<keyword id="KW-0325">Glycoprotein</keyword>
+<keyword id="KW-0336">GPI-anchor</keyword>
+<keyword id="KW-0393">Immunoglobulin domain</keyword>
+<keyword id="KW-0449">Lipoprotein</keyword>
+<keyword id="KW-0472">Membrane</keyword>
+<keyword id="KW-0553">Oncogene</keyword>
+<keyword id="KW-0621">Polymorphism</keyword>
+<keyword id="KW-1185">Reference proteome</keyword>
+<keyword id="KW-0677">Repeat</keyword>
+<keyword id="KW-0732">Signal</keyword>
+<feature type="signal peptide">
+<location>
+<begin position="1"/>
+<end position="34"/>
+</location>
+</feature>
+<feature type="chain" description="Carcinoembryonic antigen-related cell adhesion molecule 5" id="PRO_0000014566">
+<location>
+<begin position="35"/>
+<end position="685"/>
+</location>
+</feature>
+<feature type="propeptide" description="Removed in mature form" id="PRO_0000014567" evidence="3">
+<location>
+<begin position="686"/>
+<end position="702"/>
+</location>
+</feature>
+<feature type="domain" description="Ig-like V-type" evidence="2">
+<location>
+<begin position="35"/>
+<end position="144"/>
+</location>
+</feature>
+<feature type="domain" description="Ig-like C2-type 1" evidence="4">
+<location>
+<begin position="145"/>
+<end position="232"/>
+</location>
+</feature>
+<feature type="domain" description="Ig-like C2-type 2" evidence="4">
+<location>
+<begin position="240"/>
+<end position="315"/>
+</location>
+</feature>
+<feature type="domain" description="Ig-like C2-type 3" evidence="4">
+<location>
+<begin position="323"/>
+<end position="410"/>
+</location>
+</feature>
+<feature type="domain" description="Ig-like C2-type 4" evidence="4">
+<location>
+<begin position="418"/>
+<end position="495"/>
+</location>
+</feature>
+<feature type="domain" description="Ig-like C2-type 5" evidence="4">
+<location>
+<begin position="501"/>
+<end position="588"/>
+</location>
+</feature>
+<feature type="domain" description="Ig-like C2-type 6" evidence="4">
+<location>
+<begin position="593"/>
+<end position="675"/>
+</location>
+</feature>
+<feature type="lipid moiety-binding region" description="GPI-anchor amidated alanine" evidence="12">
+<location>
+<position position="685"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="104"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="115"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="152"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="182"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="197"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="204"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="208"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5 11">
+<location>
+<position position="246"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="256"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="274"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="288"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="292"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="309"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="330"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="351"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="360"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="375"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="432"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="466"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="480"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="508"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="529"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="553"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5 9">
+<location>
+<position position="560"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="580"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="612"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="650"/>
+</location>
+</feature>
+<feature type="glycosylation site" description="N-linked (GlcNAc...) asparagine" evidence="5">
+<location>
+<position position="665"/>
+</location>
+</feature>
+<feature type="disulfide bond" evidence="4">
+<location>
+<begin position="167"/>
+<end position="215"/>
+</location>
+</feature>
+<feature type="disulfide bond" evidence="4">
+<location>
+<begin position="259"/>
+<end position="299"/>
+</location>
+</feature>
+<feature type="disulfide bond" evidence="4">
+<location>
+<begin position="345"/>
+<end position="393"/>
+</location>
+</feature>
+<feature type="disulfide bond" evidence="4">
+<location>
+<begin position="437"/>
+<end position="477"/>
+</location>
+</feature>
+<feature type="disulfide bond" evidence="4">
+<location>
+<begin position="523"/>
+<end position="571"/>
+</location>
+</feature>
+<feature type="disulfide bond" evidence="4">
+<location>
+<begin position="615"/>
+<end position="655"/>
+</location>
+</feature>
+<feature type="splice variant" description="In isoform 2." id="VSP_053414" evidence="20">
+<location>
+<position position="320"/>
+</location>
+</feature>
+<feature type="sequence variant" description="In dbSNP:rs12971352." id="VAR_061310">
+<original>I</original>
+<variation>V</variation>
+<location>
+<position position="80"/>
+</location>
+</feature>
+<feature type="sequence variant" description="In dbSNP:rs28683503." id="VAR_061311">
+<original>V</original>
+<variation>A</variation>
+<location>
+<position position="83"/>
+</location>
+</feature>
+<feature type="sequence variant" description="In dbSNP:rs3815780." id="VAR_056028">
+<original>Q</original>
+<variation>P</variation>
+<location>
+<position position="137"/>
+</location>
+</feature>
+<feature type="sequence variant" description="In dbSNP:rs10407503." id="VAR_031091">
+<original>A</original>
+<variation>D</variation>
+<location>
+<position position="340"/>
+</location>
+</feature>
+<feature type="sequence variant" description="In dbSNP:rs7249230." id="VAR_024493" evidence="13 16 17 18 19">
+<original>K</original>
+<variation>E</variation>
+<location>
+<position position="398"/>
+</location>
+</feature>
+<feature type="sequence variant" description="In dbSNP:rs10423171." id="VAR_031092">
+<original>R</original>
+<variation>S</variation>
+<location>
+<position position="664"/>
+</location>
+</feature>
+<feature type="sequence variant" description="In dbSNP:rs9621." id="VAR_056029">
+<original>G</original>
+<variation>R</variation>
+<location>
+<position position="678"/>
+</location>
+</feature>
+<feature type="mutagenesis site" description="No effect on dimerization. Reduced affinity for E.coli Dr adhesins." evidence="10">
+<original>F</original>
+<variation>I</variation>
+<location>
+<position position="63"/>
+</location>
+</feature>
+<feature type="mutagenesis site" description="Abolishes dimerization. Reduced affinity for E.coli Dr adhesins." evidence="10">
+<original>F</original>
+<variation>R</variation>
+<location>
+<position position="63"/>
+</location>
+</feature>
+<feature type="mutagenesis site" description="Abolishes dimerization." evidence="7 10">
+<original>S</original>
+<variation>N</variation>
+<location>
+<position position="66"/>
+</location>
+</feature>
+<feature type="mutagenesis site" description="Abolishes dimerization." evidence="7">
+<original>Y</original>
+<variation>A</variation>
+<location>
+<position position="68"/>
+</location>
+</feature>
+<feature type="mutagenesis site" description="No effect on dimerization." evidence="7">
+<original>Y</original>
+<variation>F</variation>
+<location>
+<position position="68"/>
+</location>
+</feature>
+<feature type="mutagenesis site" description="Abolishes dimerization." evidence="7">
+<original>K</original>
+<variation>A</variation>
+<location>
+<position position="69"/>
+</location>
+</feature>
+<feature type="mutagenesis site" description="Abolishes dimerization." evidence="10">
+<original>V</original>
+<variation>A</variation>
+<location>
+<position position="73"/>
+</location>
+</feature>
+<feature type="mutagenesis site" description="No effect on dimerization." evidence="10">
+<original>D</original>
+<variation>A</variation>
+<location>
+<position position="74"/>
+</location>
+</feature>
+<feature type="mutagenesis site" description="Abolishes dimerization." evidence="10">
+<original>D</original>
+<variation>L</variation>
+<variation>R</variation>
+<location>
+<position position="74"/>
+</location>
+</feature>
+<feature type="mutagenesis site" description="Abolishes dimerization. Reduced affinity for E.coli Dr adhesins." evidence="7 10">
+<original>Q</original>
+<variation>L</variation>
+<variation>R</variation>
+<location>
+<position position="78"/>
+</location>
+</feature>
+<feature type="mutagenesis site" description="Abolishes dimerization. Reduced affinity for E.coli Dr adhesins." evidence="10">
+<original>I</original>
+<variation>A</variation>
+<location>
+<position position="125"/>
+</location>
+</feature>
+<feature type="mutagenesis site" description="No effect on dimerization. Reduced affinity for E.coli Dr adhesins." evidence="10">
+<original>L</original>
+<variation>A</variation>
+<variation>C</variation>
+<location>
+<position position="129"/>
+</location>
+</feature>
+<feature type="mutagenesis site" description="Abolishes dimerization. Reduced affinity for E.coli Dr adhesins." evidence="10">
+<original>L</original>
+<variation>S</variation>
+<location>
+<position position="129"/>
+</location>
+</feature>
+<feature type="mutagenesis site" description="Abolishes dimerization." evidence="10">
+<original>E</original>
+<variation>A</variation>
+<location>
+<position position="133"/>
+</location>
+</feature>
+<feature type="sequence conflict" description="In Ref. 3; AAA62835." ref="3" evidence="21">
+<original>F</original>
+<variation>L</variation>
+<location>
+<position position="641"/>
+</location>
+</feature>
+<feature type="sequence conflict" description="In Ref. 3; AAA62835." ref="3" evidence="21">
+<original>T</original>
+<variation>Q</variation>
+<location>
+<position position="646"/>
+</location>
+</feature>
+<feature type="sequence conflict" description="In Ref. 3; AAA62835." ref="3" evidence="21">
+<original>V</original>
+<variation>A</variation>
+<location>
+<position position="689"/>
+</location>
+</feature>
+<feature type="strand" evidence="1">
+<location>
+<begin position="37"/>
+<end position="46"/>
+</location>
+</feature>
+<feature type="strand" evidence="1">
+<location>
+<begin position="51"/>
+<end position="57"/>
+</location>
+</feature>
+<feature type="strand" evidence="1">
+<location>
+<begin position="60"/>
+<end position="72"/>
+</location>
+</feature>
+<feature type="helix" evidence="1">
+<location>
+<begin position="75"/>
+<end position="77"/>
+</location>
+</feature>
+<feature type="strand" evidence="1">
+<location>
+<begin position="78"/>
+<end position="83"/>
+</location>
+</feature>
+<feature type="turn" evidence="1">
+<location>
+<begin position="84"/>
+<end position="87"/>
+</location>
+</feature>
+<feature type="strand" evidence="1">
+<location>
+<begin position="88"/>
+<end position="91"/>
+</location>
+</feature>
+<feature type="strand" evidence="1">
+<location>
+<begin position="99"/>
+<end position="101"/>
+</location>
+</feature>
+<feature type="strand" evidence="1">
+<location>
+<begin position="107"/>
+<end position="109"/>
+</location>
+</feature>
+<feature type="helix" evidence="1">
+<location>
+<begin position="114"/>
+<end position="116"/>
+</location>
+</feature>
+<feature type="strand" evidence="1">
+<location>
+<begin position="118"/>
+<end position="126"/>
+</location>
+</feature>
+<feature type="strand" evidence="1">
+<location>
+<begin position="132"/>
+<end position="141"/>
+</location>
+</feature>
+<evidence key="1" type="ECO:0000244">
+<source>
+<dbReference type="PDB" id="2QSQ"/>
+</source>
+</evidence>
+<evidence key="2" type="ECO:0000250">
+<source>
+<dbReference type="UniProtKB" id="P31997"/>
+</source>
+</evidence>
+<evidence key="3" type="ECO:0000255"/>
+<evidence key="4" type="ECO:0000255">
+<source>
+<dbReference type="PROSITE-ProRule" id="PRU00114"/>
+</source>
+</evidence>
+<evidence key="5" type="ECO:0000255">
+<source>
+<dbReference type="PROSITE-ProRule" id="PRU00498"/>
+</source>
+</evidence>
+<evidence key="6" type="ECO:0000269">
+<source>
+<dbReference type="PubMed" id="10436421"/>
+</source>
+</evidence>
+<evidence key="7" type="ECO:0000269">
+<source>
+<dbReference type="PubMed" id="10864933"/>
+</source>
+</evidence>
+<evidence key="8" type="ECO:0000269">
+<source>
+<dbReference type="PubMed" id="10910050"/>
+</source>
+</evidence>
+<evidence key="9" type="ECO:0000269">
+<source>
+<dbReference type="PubMed" id="16740002"/>
+</source>
+</evidence>
+<evidence key="10" type="ECO:0000269">
+<source>
+<dbReference type="PubMed" id="18086185"/>
+</source>
+</evidence>
+<evidence key="11" type="ECO:0000269">
+<source>
+<dbReference type="PubMed" id="19159218"/>
+</source>
+</evidence>
+<evidence key="12" type="ECO:0000269">
+<source>
+<dbReference type="PubMed" id="2317824"/>
+</source>
+</evidence>
+<evidence key="13" type="ECO:0000269">
+<source>
+<dbReference type="PubMed" id="2342461"/>
+</source>
+</evidence>
+<evidence key="14" type="ECO:0000269">
+<source>
+<dbReference type="PubMed" id="26483485"/>
+</source>
+</evidence>
+<evidence key="15" type="ECO:0000269">
+<source>
+<dbReference type="PubMed" id="2803308"/>
+</source>
+</evidence>
+<evidence key="16" type="ECO:0000269">
+<source>
+<dbReference type="PubMed" id="3033671"/>
+</source>
+</evidence>
+<evidence key="17" type="ECO:0000269">
+<source>
+<dbReference type="PubMed" id="3220478"/>
+</source>
+</evidence>
+<evidence key="18" type="ECO:0000269">
+<source>
+<dbReference type="PubMed" id="3670312"/>
+</source>
+</evidence>
+<evidence key="19" type="ECO:0000269">
+<source>
+<dbReference type="PubMed" id="3814146"/>
+</source>
+</evidence>
+<evidence key="20" type="ECO:0000303">
+<source>
+<dbReference type="PubMed" id="3814146"/>
+</source>
+</evidence>
+<evidence key="21" type="ECO:0000305"/>
+<sequence length="702" mass="76795" checksum="86318E244155DB58" modified="2011-01-11" version="3" precursor="true">MESPSAPPHRWCIPWQRLLLTASLLTFWNPPTTAKLTIESTPFNVAEGKEVLLLVHNLPQHLFGYSWYKGERVDGNRQIIGYVIGTQQATPGPAYSGREIIYPNASLLIQNIIQNDTGFYTLHVIKSDLVNEEATGQFRVYPELPKPSISSNNSKPVEDKDAVAFTCEPETQDATYLWWVNNQSLPVSPRLQLSNGNRTLTLFNVTRNDTASYKCETQNPVSARRSDSVILNVLYGPDAPTISPLNTSYRSGENLNLSCHAASNPPAQYSWFVNGTFQQSTQELFIPNITVNNSGSYTCQAHNSDTGLNRTTVTTITVYAEPPKPFITSNNSNPVEDEDAVALTCEPEIQNTTYLWWVNNQSLPVSPRLQLSNDNRTLTLLSVTRNDVGPYECGIQNKLSVDHSDPVILNVLYGPDDPTISPSYTYYRPGVNLSLSCHAASNPPAQYSWLIDGNIQQHTQELFISNITEKNSGLYTCQANNSASGHSRTTVKTITVSAELPKPSISSNNSKPVEDKDAVAFTCEPEAQNTTYLWWVNGQSLPVSPRLQLSNGNRTLTLFNVTRNDARAYVCGIQNSVSANRSDPVTLDVLYGPDTPIISPPDSSYLSGANLNLSCHSASNPSPQYSWRINGIPQQHTQVLFIAKITPNNNGTYACFVSNLATGRNNSIVKSITVSASGTSPGLSAGATVGIMIGVLVGVALI</sequence>
+</entry>
+<copyright>
+Copyrighted by the UniProt Consortium, see https://www.uniprot.org/terms
+Distributed under the Creative Commons Attribution (CC BY 4.0) License
+</copyright>
+</uniprot>
