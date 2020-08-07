@@ -25,17 +25,18 @@ from Bio import BiopythonWarning
 warnings.simplefilter('ignore', BiopythonWarning)
 
 def matrix_from_nglview(m):
-    # take flattened 4x4 matrix from NGLView and convert to 3x3 rotation matrix
+    """Take flattened 4x4 view matrix from NGLView and convert to 3x3 rotation matrix."""
     camera_matrix = np.array(m).reshape(4,4)
     return camera_matrix[:3,:3]/np.linalg.norm(camera_matrix[:3,:3], axis=1), camera_matrix[3,:3]
 
 def matrix_to_nglview(m):
-    # take 3x3 rotation matrix and convert to flattened 4x4 for NGLView
+    """Take 3x3 rotation matrix and convert to flattened 4x4 view matrix for NGLView."""
     nglv_matrix = np.identity(4)
     nglv_matrix[:3,:3] = np.dot(m, np.array([[-1,0,0],[0,1,0],[0,0,-1]]))
     return list(nglv_matrix.flatten())
 
 def group_by(l, key):
+    """Take a list of dictionaries and group them according to a key."""
     d = dict()
     for i in l:
         k = key(i)
@@ -44,18 +45,6 @@ def group_by(l, key):
         else:
             d[k] = [i]
     return d
-
-def not_none(x):
-    if x is None:
-        return ""
-    else:
-        if isinstance(x, str):
-            return x
-        else:
-            if x[0] is None:
-                return ""
-            else:
-                return str(x[1])
 
 def safe_union_accumulate(polys):
     # union of list of shapely polygons
@@ -69,7 +58,6 @@ def safe_union_accumulate(polys):
         except:
             exception_counter += 1
             pass
-    #print("UNION ACCUMULATE CAUGHT {} EXCEPTION(S)!!".format(exception_counter))
     return u
 
 def safe_union(a, b):
@@ -92,7 +80,9 @@ def shade_from_color(color, x, range):
     return colorsys.hls_to_rgb(h, l_new, s)
 
 def get_sequential_colors(colors='Set1', n=1):
-    # sample n colors from a colormap
+    """
+    Sample n colors sequentially from a named matplotlib ColorMap.
+    """
     # uses matplotlib.colors.ColorMap.N to distinguish continuous/discrete
     cmap = matplotlib.cm.get_cmap(colors)
     if cmap.N == 256:
@@ -154,6 +144,7 @@ def polygon_to_path(polygon, min_interior_length=40, offset=np.array([0,0]), sca
     return Path(transformed_vertices, codes)
 
 def plot_polygon(poly, facecolor='orange', edgecolor='k', linewidth=0.7, axes=None, zorder_mod=0, offset=np.array([0,0]), scale=1.0, flip=False, recenter=None, min_area=7):
+    """Draw a Shapely polygon using matplotlib Patches."""
     if axes is None:
         axs = plt.gca()
         axs.set_aspect('equal')
@@ -169,7 +160,7 @@ def plot_polygon(poly, facecolor='orange', edgecolor='k', linewidth=0.7, axes=No
             plot_polygon(p, axes=axs, facecolor=facecolor, edgecolor=edgecolor, linewidth=linewidth, scale=scale, zorder_mod=zorder_mod, offset=offset, flip=flip, recenter=recenter)
 
 def orientation_from_topology(topologies):
-    # guess whether protein is N-C oriented based on UniProt topology annotation
+    """Infer protein vertical orientation (N->C or C->N) from UniProt topology annotation."""
     first_ex_flag = True
     first_ex = None
     first_cy_flag = True
@@ -190,7 +181,7 @@ def orientation_from_topology(topologies):
             first_cy = (start, end)
             first_cy_flag = False
 
-    # rough heuristic for now
+    # rough heuristic for now, works for single pass transmembrane proteins
     orient_from_topo = 1
     if first_ex is not None and first_cy is not None:
         if first_ex[0] > first_cy[0]:
@@ -230,11 +221,12 @@ def split_on_labels(m, labels):
     return coords
 
 def get_z_slice_labels(xyz, width):
-    """ Take an Nx3 coordinate matrix and return labels"""
+    # Take an Nx3 coordinate matrix and return Z bin
     binned = (xyz[:,-1]/width).astype(int)
     return binned - np.min(binned)
 
 class Cartoon:
+    """Main object used to build a molecular cartoon from a PDB structure."""
     def __init__(self, file, model=0, chain="all", uniprot=None, view=True):
 
         # check whether outline has been generated yet
@@ -412,7 +404,7 @@ class Cartoon:
         self.rotated_coord = np.dot(self.coord, self.view_matrix)
 
     def load_pymol_view(self, file):
-        # read rotation matrix from PyMol get_view command
+        """Read rotation matrix from output of PyMol ``get_view`` command."""
         matrix = []
         with open(file,'r') as view:
             for line in view:
@@ -425,7 +417,7 @@ class Cartoon:
         self._set_nglview_orientation(self.view_matrix)
 
     def load_chimera_view(self, file):
-        # read rotation matrix from Chimera matrixget command
+        """Read rotation matrix from output of Chimera ``matrixset`` command."""
         matrix = []
         with open(file,'r') as view:
             for line in view.readlines()[1:4]:
@@ -438,14 +430,17 @@ class Cartoon:
         self._set_nglview_orientation(self.view_matrix)
 
     def save_view_matrix(self, p):
+        """Save rotation matrix to a NumPy text file."""
         self._update_view_matrix()
         np.savetxt(p, self.view_matrix)
 
     def load_view_matrix(self, p):
+        """Load rotation matrix from a NumPy text file."""
         self.view_matrix = np.loadtxt(p)
         self._set_nglview_orientation(self.view_matrix)
 
     def outline(self, by="all", depth=None, depth_contour_interval=3, occlude=False, only_ca=False, only_annotated=False, radius=None, back_outline=False, align_transmembrane=False):
+        """Create 2D projection from coordinates and outline atoms."""
 
         # check options
         assert by in ["all", "residue", "chain", "domain", "topology"], "Option not recognized"
@@ -593,7 +588,9 @@ class Cartoon:
     def plot(self, colors=None, axes_labels=False, color_residues_by=None, edge_color="black", line_width=0.7,
         depth_shading=False, depth_lines=False, shading_range=0.4, smoothing=False, do_show=True, axes=None, save=None, dpi=300):
         """
-        mirroring biopython's phylogeny drawing options
+        Style and draw protein cartoon generated from the ``outline`` function.
+
+        Mirroring biopython's phylogeny drawing options
         https://biopython.org/DIST/docs/api/Bio.Phylo._utils-module.html
         can optionally pass a matplotlib Axes instance instead of creating a new one
         if do_show is false then return axes object
@@ -632,7 +629,6 @@ class Cartoon:
         self._axes= axs
 
         # color schemes
-        #default_color = '#D3D3D3'
         default_color = 'tab:blue'
         default_cmap = 'Set1'
         named_colors = [*mcolors.BASE_COLORS.keys(), *mcolors.TABLEAU_COLORS.keys(), *mcolors.CSS4_COLORS.keys(), *mcolors.XKCD_COLORS.keys()]
@@ -728,6 +724,7 @@ class Cartoon:
             return axs
 
     def export(self, fname, axes=None):
+        """Export a pickle object containing styled polygons than can be combined using ``scene``"""
         assert(len(self._styled_polygons) > 0)
 
         if axes is None:
@@ -749,9 +746,7 @@ class Cartoon:
             pickle.dump(data, f)
 
 def make_cartoon(args):
-    """
-    basic functionality of pdb2svg.py (doesn't support all arguments)
-    """
+    """Build a cartoon in one-go. Called when running ``cellscape cartoon``."""
 
     # accept list of chains for backwards-compatibility
     # convert to string e.g. ABCD for current interface

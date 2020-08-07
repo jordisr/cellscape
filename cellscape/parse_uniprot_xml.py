@@ -1,7 +1,3 @@
-'''
-Read domains from Uniprot XML into a custom object
-'''
-
 import xml.etree.ElementTree as ET
 import os
 import urllib
@@ -10,7 +6,7 @@ import argparse
 import json
 
 class UniprotRecord:
-    """Data structure to hold topological/domain information"""
+    """Data structure to hold Uniprot annotations for single sequence."""
     def __init__(self, id, name=None):
         self.id = id
         self.name = name
@@ -46,7 +42,7 @@ class UniprotRecord:
 
 def parse_xml(xmlpath):
     """
-    Parse Uniprot XML file to return list of record objects
+    Parse Uniprot XML file to return list of UniprotRecord objects.
     """
     tree = ET.parse(xmlpath)
     root = tree.getroot()
@@ -98,7 +94,7 @@ def parse_xml(xmlpath):
     return(sequences)
 
 def split_uniprot_xml(xmlpath, outpath='.'):
-    # take file of multiple uniprot records and split to individual files
+    """Take a multi-record XML file and split to one XML file per entry."""
     tree = ET.parse(xmlpath)
     root = tree.getroot()
     ns = '{http://uniprot.org/uniprot}'
@@ -108,6 +104,7 @@ def split_uniprot_xml(xmlpath, outpath='.'):
             xml_out.write(ET.tostring(entry).decode('utf-8'))
 
 def download_uniprot_record(record, fileformat, outdir):
+    """Download record from Uniprot server."""
     file_path = "{}.{}".format(record, fileformat)
     out_path = "{}/{}".format(outdir, file_path)
     if not os.path.exists(out_path):

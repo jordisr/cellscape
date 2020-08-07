@@ -6,8 +6,6 @@ import matplotlib.lines as mlines
 from matplotlib import lines, text, cm
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from scipy import interpolate
-import shapely.geometry as sg
-import shapely.ops as so
 import os, sys, argparse, pickle
 import glob
 import csv
@@ -15,14 +13,12 @@ import csv
 from .cartoon import plot_polygon
 
 def rotation_matrix_2d(theta):
+    """Return matrix to rotate 2D coordinates by angle theta."""
     return np.array([[np.cos(theta), -1*np.sin(theta)],[np.sin(theta), np.cos(theta)]])
 
 def draw_object(o, axs, offset=[0,0], flip=False, background=False, scaling=1, zorder=3, recenter=None, color=None, linewidth=None):
-    """
-    add object to axes
-    abstracting some of the drawing details, might want to move to a class
-    color option overrides original color
-    """
+    # older function for adding proteins to membrane visualization
+    # now just use plot_polygon
 
     # use thinner line with many objects (e.g. with --residues)
     if linewidth is None:
@@ -59,7 +55,7 @@ def draw_object(o, axs, offset=[0,0], flip=False, background=False, scaling=1, z
         else:
             axs.fill((xy[:,0]+offset[0])*scaling, (xy[:,1]+offset[1])*scaling, fc=fc, ec='k', alpha=0.8, linewidth=lw*scaling, zorder=1)
 
-class membrane_cartoon:
+class Membrane:
     def __init__(self, width, thickness, axes, base_y=0):
         self.width = width
         self.thickness = thickness
@@ -98,6 +94,7 @@ class membrane_cartoon:
                 self.axes.add_patch(mpatches.Circle((i*self.head_radius*2, -1*self.thickness+membrane_y), self.head_radius, facecolor=lipid_head_fc, ec='k', linewidth=0.3, alpha=1, zorder=2))
 
 def make_scene(args):
+    """Build a scene in one-go. Called when running ``cellscape scene``."""
     # list of protein polygons to draw
     object_list = []
     num_files = 0
@@ -215,7 +212,7 @@ def make_scene(args):
 
     if args.membrane is not None:
         total_width = np.sum([o['width'] for o in object_list])+len(object_list)*args.padding
-        membrane = membrane_cartoon(width=total_width, axes=axs, thickness=40)
+        membrane = Membrane(width=total_width, axes=axs, thickness=40)
 
         if args.membrane == "flat":
             membrane.flat()
