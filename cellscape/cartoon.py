@@ -14,11 +14,13 @@ import operator
 import colorsys
 import warnings
 from Bio.PDB import *
+from Bio.PDB.Polypeptide import three_to_one
 from scipy import signal, interpolate
 from scipy.spatial.distance import pdist, squareform
 import time
 
 from .parse_uniprot_xml import parse_xml
+from .parse_alignment import align_pair, overlap_from_alignment
 
 # silence warnings from Biopython that might pop up when loading the PDB
 from Bio import BiopythonWarning
@@ -270,15 +272,19 @@ class Cartoon:
 
         # data structure holding residue information
         self.residues = dict()
+        self.sequence = dict()
         self.coord = []
         self.ca_atoms = []
         all_atoms = 0
         for chain in self.chains:
+            self.sequence[chain] = ""
             self.residues[chain] = dict()
             for res in self.structure[chain]:
                 res_id = res.get_full_id()[3][1]
                 if res.get_full_id()[3][0][0] == "H": # skip hetatm records
                     continue
+                res_aa = three_to_one(res.get_resname())
+                self.sequence[chain] += res_aa
                 residue_atoms = 0
                 these_atoms = []
                 for a in res:
@@ -292,6 +298,7 @@ class Cartoon:
                 self.residues[chain][res_id] = {
                 'chain':chain,
                 'id':res_id,
+                'amino_acid':res_aa,
                 'object':res,
                 'coord':(all_atoms-residue_atoms, all_atoms),
                 'coord_ca':(this_ca_atom, this_ca_atom+1),
@@ -306,12 +313,17 @@ class Cartoon:
             self._preprocess_uniprot(self._uniprot_xml)
 
     def _preprocess_uniprot(self, xml):
-        # TODO support more than one XML file (e.g. for differnet chains)
+        # TODO support more than one XML file (e.g. for different chains?)
         self._uniprot = parse_xml(xml)[0]
 
-        # TODO add sequence alignment to find this automatically
+        # align PDB and UniProt sequences to find offset
         uniprot_chain = self.chains[0]
-        uniprot_offset = 0
+        pdb_seq = self.sequence[uniprot_chain]
+        uniprot_seq = self._uniprot.sequence
+        first_residue_id = sorted(self.residues[uniprot_chain])[0]
+        # alignment coordinates are 0-indexed (but PDB numbering and Uniprot ranges are 1-indexed)
+        overlap = np.array(overlap_from_alignment(align_pair(uniprot_seq, pdb_seq))) + np.array([1,1,1,1])
+        uniprot_offset = overlap[0] - first_residue_id
 
         if len(self._uniprot.domains) > 0:
             self._annotate_residues_from_uniprot(self._uniprot.domains, name_key="domain", residues=self.residues[uniprot_chain], offset=uniprot_offset)
@@ -759,14 +771,18 @@ def make_cartoon(args):
     molecule = Cartoon(args.pdb, chain=chain, model=args.model, uniprot=args.uniprot, view=False)
 
     # open first line to identify view file
-    with open(args.view) as view_f:
-        first_line = view_f.readline()
-    if first_line[:8] == 'set_view':
-        molecule.load_pymol_view(args.view)
-    elif first_line[:5] == 'Model':
-        molecule.load_chimera_view(args.view)
+    if args.view is not None:
+        with open(args.view) as view_f:
+            first_line = view_f.readline()
+        if first_line[:8] == 'set_view':
+            molecule.load_pymol_view(args.view)
+        elif first_line[:5] == 'Model':
+            molecule.load_chimera_view(args.view)
+        else:
+            molecule.load_view_matrix(args.view)
     else:
-        molecule.load_view_matrix(args.view)
+        # if no view matrix provided just use default PDB orientation for now
+        molecule.view_matrix = np.identity(3)
 
     molecule.outline(args.outline_by, occlude=args.occlude, radius=args.radius, only_annotated=args.only_annotated)
     if args.outline_by == "residue" and args.color_by != "same":

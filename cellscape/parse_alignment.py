@@ -25,6 +25,10 @@ def overlap_from_alignment(a):
     np.where(s2_nogap == overlap_align[0])[1][0],
     np.where(s2_nogap == overlap_align[1])[1][0])
 
+def align_pair(s1, s2):
+    # wrapper for biopython pairwise alignment
+    return pairwise2.align.localds(s1, s2, blosum62, -3, -3, one_alignment_only=True)[0]
+
 def align_all_pairs(s):
     for i in range(len(s)):
         for j in range(i+1, len(s)):
