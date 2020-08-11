@@ -451,7 +451,7 @@ class Cartoon:
         self.view_matrix = np.loadtxt(p)
         self._set_nglview_orientation(self.view_matrix)
 
-    def outline(self, by="all", depth=None, depth_contour_interval=3, occlude=False, only_ca=False, only_annotated=False, radius=None, back_outline=False, align_transmembrane=False):
+    def outline(self, by="all", depth=None, depth_contour_interval=3, only_ca=False, only_annotated=False, radius=None, back_outline=False, align_transmembrane=False):
         """Create 2D projection from coordinates and outline atoms."""
 
         # check options
@@ -614,6 +614,9 @@ class Cartoon:
             - dict of names to colors e.g. {"domain A": "red", "domain B":"blue"} (dict)
             - named discrete or continuous color scheme e.g. "Set1" (string)
         """
+
+        # check options
+        assert save.split('.')[-1] in ['png','pdf','svg','ps'], "image format not recognized"
 
         self._styled_polygons = []
 
@@ -784,7 +787,7 @@ def make_cartoon(args):
         # if no view matrix provided just use default PDB orientation for now
         molecule.view_matrix = np.identity(3)
 
-    molecule.outline(args.outline_by, occlude=args.occlude, radius=args.radius, only_annotated=args.only_annotated)
+    molecule.outline(args.outline_by, depth=args.depth, radius=args.radius, only_annotated=args.only_annotated, only_ca=args.only_ca, depth_contour_interval=args.depth_contour_interval)
     if args.outline_by == "residue" and args.color_by != "same":
         color_residues_by = args.color_by
     else:
@@ -794,7 +797,7 @@ def make_cartoon(args):
         colors = args.colors
     else:
         colors = None
-    molecule.plot(do_show=False, axes_labels=args.axes, colors=colors, color_residues_by=color_residues_by, dpi=args.dpi, save="{}.{}".format(args.save, args.format), depth_shading=True, edge_color=args.edge_color, line_width=args.line_width)
+    molecule.plot(do_show=False, axes_labels=args.axes, colors=colors, color_residues_by=color_residues_by, dpi=args.dpi, save=args.save, depth_shading=args.depth_shading, depth_lines=args.depth_lines, edge_color=args.edge_color, line_width=args.line_width)
 
     if args.export:
         molecule.export(args.save)

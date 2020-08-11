@@ -95,6 +95,9 @@ class Membrane:
 
 def make_scene(args):
     """Build a scene in one-go. Called when running ``cellscape scene``."""
+
+    assert args.save.split('.')[-1] in ['png','pdf','svg','ps'], "image format not recognized"
+
     # list of protein polygons to draw
     object_list = []
     num_files = 0
@@ -250,4 +253,4 @@ def make_scene(args):
                 plot_polygon(p["polygon"], offset=[background_w, 0], scale=scaling_factor, facecolor=p["facecolor"], edgecolor=p["edgecolor"], linewidth=p["linewidth"]*scaling_factor, zorder_mod=-2)
             background_w += (o['width']+args.padding)
 
-    plt.savefig(args.save+'.'+args.format, transparent=True, pad_inches=0, bbox_inches='tight', dpi=args.dpi)
+    plt.savefig(args.save, transparent=True, pad_inches=0, bbox_inches='tight', dpi=args.dpi)
