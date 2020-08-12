@@ -140,7 +140,7 @@ def make_scene(args):
 
     if args.csv:
         # total sum of protein counts
-        protein_names = np.array(sorted(protein_data.keys()))
+        protein_names = np.array(list(protein_data.keys()))
         protein_stoich = np.array([protein_data[p][0] for p in protein_names])
         sum_stoich = np.sum(protein_stoich)
         stoich_weights = protein_stoich / sum_stoich
@@ -242,7 +242,7 @@ def make_scene(args):
             plot_polygon(p["polygon"], offset=[w, y_offset], facecolor=facecolor, edgecolor=edgecolor, linewidth=p["linewidth"])
             if args.labels:
                 # option is experimental, text needs to be properly sized and placed
-                plt.text(w+o['width']/2,-100, protein_names[i], rotation=90, fontsize=10)
+                plt.text(w+o['width']/2,-100, o.get("name", ""), rotation=90, fontsize=10)
         w += o['width']+args.padding
 
     if args.background:

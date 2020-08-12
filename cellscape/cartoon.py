@@ -370,7 +370,9 @@ class Cartoon:
         if flip is None:
             if self._uniprot_xml and hasattr(self._uniprot, "topology"):
                 nc_orient = orientation_from_topology(self._uniprot.topology)
-        elif nc_orient in [True, False]:
+            else:
+                nc_orient = True
+        elif isinstance(flip, bool):
             nc_orient = flip
 
         # rotate structure so N-C vector is aligned with the vertical axis
@@ -615,9 +617,6 @@ class Cartoon:
             - named discrete or continuous color scheme e.g. "Set1" (string)
         """
 
-        # check options
-        assert save.split('.')[-1] in ['png','pdf','svg','ps'], "image format not recognized"
-
         self._styled_polygons = []
 
         if axes is None:
@@ -731,6 +730,7 @@ class Cartoon:
             self._styled_polygons.append({"polygon":poly_to_draw, "facecolor":fc, "edgecolor":edge_color, "linewidth":lw})
 
         if save is not None:
+            assert save.split('.')[-1] in ['png','pdf','svg','ps'], "image format not recognized"
             plt.savefig(save, dpi=dpi, transparent=True, pad_inches=0, bbox_inches='tight')
 
         if do_show:
