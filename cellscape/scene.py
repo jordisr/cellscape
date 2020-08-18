@@ -76,15 +76,16 @@ class Membrane:
         self.height_at = lambda x: self.height_fn(x) + self.y
 
     def draw(self, lipids=False):
-        membrane_box_fc='#C4E7EF'
+
         membrane_x = np.linspace(0,self.width,200)
         membrane_y_top = np.array([self.height_at(x) for x in membrane_x])
         membrane_y_bot = membrane_y_top-self.thickness
-        plt.fill_between(membrane_x, membrane_y_top-self.head_radius, membrane_y_bot+self.head_radius, color=membrane_box_fc, zorder=1.6)
+
         if lipids:
-            # color scheme
+            membrane_box_fc='#C4E7EF'
             lipid_head_fc='#D6D1EF'
             lipid_tail_fc='#A3DCEF'
+            plt.fill_between(membrane_x, membrane_y_top-self.head_radius, membrane_y_bot+self.head_radius, color=membrane_box_fc, zorder=1.6)
             num_lipids = int(self.width/(2*self.head_radius))
             for i in range(num_lipids):
                 membrane_y = self.height_at(i/num_lipids*self.width)
@@ -92,6 +93,10 @@ class Membrane:
                 self.axes.add_line(mlines.Line2D([i*self.head_radius*2, i*self.head_radius*2], [-38+membrane_y, -24+membrane_y], zorder=1.7, c=lipid_tail_fc, linewidth=self.head_radius*.7, alpha=1, solid_capstyle='round'))
                 self.axes.add_patch(mpatches.Circle((i*self.head_radius*2, -1*self.head_radius+membrane_y), self.head_radius, facecolor=lipid_head_fc, ec='k', linewidth=0.3, alpha=1, zorder=2))
                 self.axes.add_patch(mpatches.Circle((i*self.head_radius*2, -1*self.thickness+membrane_y), self.head_radius, facecolor=lipid_head_fc, ec='k', linewidth=0.3, alpha=1, zorder=2))
+
+        else:
+            membrane_box_fc='silver'
+            plt.fill_between(membrane_x, membrane_y_top, membrane_y_bot, color=membrane_box_fc, zorder=1.6)
 
 def make_scene(args):
     """Build a scene in one-go. Called when running ``cellscape scene``."""
@@ -242,7 +247,13 @@ def make_scene(args):
             plot_polygon(p["polygon"], offset=[w, y_offset], facecolor=facecolor, edgecolor=edgecolor, linewidth=p["linewidth"])
             if args.labels:
                 # option is experimental, text needs to be properly sized and placed
-                plt.text(w+o['width']/2,-100, o.get("name", ""), rotation=90, fontsize=10)
+                if len(object_list) > 20:
+                    fontsize = 5
+                elif len(object_list) > 10:
+                    fontsize = 10
+                else:
+                    fontsize = 15
+                plt.text(w+o['width']/2,-100, o.get("name", ""), rotation=90, fontsize=fontsize)
         w += o['width']+args.padding
 
     if args.background:

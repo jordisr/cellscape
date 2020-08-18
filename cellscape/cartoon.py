@@ -21,6 +21,7 @@ import time
 
 from .parse_uniprot_xml import parse_xml
 from .parse_alignment import align_pair, overlap_from_alignment
+from .util import *
 
 # silence warnings from Biopython that might pop up when loading the PDB
 from Bio import BiopythonWarning
@@ -229,7 +230,7 @@ def get_z_slice_labels(xyz, width):
 
 class Cartoon:
     """Main object used to build a molecular cartoon from a PDB structure."""
-    def __init__(self, file, model=0, chain="all", uniprot=None, view=True):
+    def __init__(self, file, model=0, chain="all", uniprot=None, view=True, is_opm=False):
 
         # check whether outline has been generated yet
         self.outline_by = None
@@ -252,6 +253,10 @@ class Cartoon:
             for c in _all_chains:
                 if c not in self.chains:
                     self.structure.detach_child(c)
+
+        # assumes PDB is oriented as described here:
+        # https://opm.phar.umich.edu/about#features
+        self.is_opm = is_opm
 
         # view matrix and NGLView options
         self.use_nglview = view
@@ -283,7 +288,9 @@ class Cartoon:
                 res_id = res.get_full_id()[3][1]
                 if res.get_full_id()[3][0][0] == "H": # skip hetatm records
                     continue
-                res_aa = three_to_one(res.get_resname())
+                if res.get_resname() not in amino_acid_3letter:
+                    continue
+                res_aa = amino_acid_3letter[res.get_resname()]
                 self.sequence[chain] += res_aa
                 residue_atoms = 0
                 these_atoms = []
@@ -322,21 +329,22 @@ class Cartoon:
         uniprot_seq = self._uniprot.sequence
         first_residue_id = sorted(self.residues[uniprot_chain])[0]
         # alignment coordinates are 0-indexed (but PDB numbering and Uniprot ranges are 1-indexed)
-        overlap = np.array(overlap_from_alignment(align_pair(uniprot_seq, pdb_seq))) + np.array([1,1,1,1])
-        uniprot_offset = overlap[0] - first_residue_id
+        self._uniprot_overlap = np.array(overlap_from_alignment(align_pair(uniprot_seq, pdb_seq))) + np.array([1,1,1,1])
+        self._uniprot_offset = self._uniprot_overlap[0] - first_residue_id
 
         if len(self._uniprot.domains) > 0:
-            self._annotate_residues_from_uniprot(self._uniprot.domains, name_key="domain", residues=self.residues[uniprot_chain], offset=uniprot_offset)
+            self._annotate_residues_from_uniprot(self._uniprot.domains, name_key="domain", residues=self.residues[uniprot_chain], offset=self._uniprot_offset)
 
         if len(self._uniprot.topology) > 0:
-            self._annotate_residues_from_uniprot(self._uniprot.topology, name_key="topology", residues=self.residues[uniprot_chain], offset=uniprot_offset)
+            self._annotate_residues_from_uniprot(self._uniprot.topology, name_key="topology", residues=self.residues[uniprot_chain], offset=self._uniprot_offset)
 
     def _annotate_residues_from_uniprot(self, ranges, name_key, residues, offset=0):
+        # pdb_number - offset = up_number
         for row in ranges:
             (name, start, end) = row
             for r in range(start, end+1):
-                if (r+offset) in residues:
-                    residues[r+offset][name_key] = name
+                if (r-offset) in residues:
+                    residues[r-offset][name_key] = name
 
     def _coord(self, t):
         return self.coord[t[0]:t[1]]
@@ -406,10 +414,10 @@ class Cartoon:
             #print("Before", self.view._camera_orientation)
             self.view._set_camera_orientation(nglv_matrix)
             # having a bug where setting camera orientation does nothing
-            # waiting a little bit seems to fix it (maybe an issue with sync/refresh)
+            # waiting a little bit seems to fix it (maybe an issue with sync/refresh rate)
             #self.view.control.orient(nglv_matrix)
             #self.view._camera_orientation = nglv_matrix
-            time.sleep(0.1)
+            time.sleep(0.5)
             self.view.center()
             #print("After", self.view._camera_orientation)
 
@@ -453,6 +461,13 @@ class Cartoon:
         self.view_matrix = np.loadtxt(p)
         self._set_nglview_orientation(self.view_matrix)
 
+    def set_view_matrix(self, m):
+        """Manually set view matrix (3x3)."""
+        # TODO abstract other loading functions to use this (i.e. only call _set_nglview_orientation in this function)
+        assert m.shape == (3,3)
+        self.view_matrix = m
+        self._set_nglview_orientation(self.view_matrix)
+
     def outline(self, by="all", depth=None, depth_contour_interval=3, only_ca=False, only_annotated=False, radius=None, back_outline=False, align_transmembrane=False):
         """Create 2D projection from coordinates and outline atoms."""
 
@@ -464,7 +479,9 @@ class Cartoon:
         # collapse chain hierarchy into flat list
         self.residues_flat = [self.residues[c][i] for c in self.residues for i in self.residues[c]]
 
-        if self.use_nglview:
+        if self.is_opm:
+            self.set_view_matrix(np.array([[1,0,0],[0,0,1],[0,1,0]]))
+        elif self.use_nglview:
             self._update_view_matrix()
 
         # transform atomic coordinates using view matrix
@@ -472,7 +489,10 @@ class Cartoon:
 
         # recenter coordinates on lower left edge of bounding box
         offset_x = np.min(self.rotated_coord[:,0])
-        offset_y = np.min(self.rotated_coord[:,1])
+        if self.is_opm:
+            offset_y = 0 # since OPM already aligned to membrane
+        else:
+            offset_y = np.min(self.rotated_coord[:,1])
         self.rotated_coord -= np.array([offset_x, offset_y, 0])
 
         # calculate vertical offset for transmembrane proteins
