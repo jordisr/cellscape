@@ -18,7 +18,7 @@ def main():
     parser_cartoon_io.add_argument('--chain', default=['all'], help='Chain(s) in structure to outline', nargs='+')
     parser_cartoon_io.add_argument('--view', help='Camera rotation matrix (saved from cellscape, PyMOL get_view, or Chimera matrixget)')
     parser_cartoon_io.add_argument('--uniprot', help='UniProt XML file to parse for sequence/domain/topology information')
-    parser_cartoon_io.add_argument('--save', default='out.svg', help='Image output path (valid formats are png/pdf/svg/ps)')
+    parser_cartoon_io.add_argument('--save', default='out.svg', help='Image output file (valid formats are png/pdf/svg/ps)')
     parser_cartoon_io.add_argument('--export', default=False, action="store_true", help='Export Python object with structural information')
     # outline building options
     parser_cartoon_outline = parser_cartoon.add_argument_group('outline-building options')

@@ -750,7 +750,8 @@ class Cartoon:
             self._styled_polygons.append({"polygon":poly_to_draw, "facecolor":fc, "edgecolor":edge_color, "linewidth":lw})
 
         if save is not None:
-            assert save.split('.')[-1] in ['png','pdf','svg','ps'], "image format not recognized"
+            file_ext = os.path.splitext(save)[1].lower()
+            assert file_ext in ['.png','.pdf','.svg','.ps'], "Image file extension not supported"
             plt.savefig(save, dpi=dpi, transparent=True, pad_inches=0, bbox_inches='tight')
 
         if do_show:
@@ -779,6 +780,8 @@ class Cartoon:
 
         with open('{}.pickle'.format(fname),'wb') as f:
             pickle.dump(data, f)
+
+        print("Exported polygon data to {}.pickle".format(fname), file=sys.stderr)
 
 def make_cartoon(args):
     """Build a cartoon in one-go. Called when running ``cellscape cartoon``."""
@@ -820,4 +823,4 @@ def make_cartoon(args):
     molecule.plot(do_show=False, axes_labels=args.axes, colors=colors, color_residues_by=color_residues_by, dpi=args.dpi, save=args.save, depth_shading=args.depth_shading, depth_lines=args.depth_lines, edge_color=args.edge_color, line_width=args.line_width)
 
     if args.export:
-        molecule.export(args.save)
+        molecule.export(os.path.splitext(args.save)[0])
