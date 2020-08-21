@@ -106,12 +106,13 @@ def split_uniprot_xml(xmlpath, outpath='.'):
 def download_uniprot_record(record, fileformat, outdir):
     """Download record from Uniprot server."""
     file_path = "{}.{}".format(record, fileformat)
-    out_path = "{}/{}".format(outdir, file_path)
+    out_path = os.path.join(outdir, file_path)
     if not os.path.exists(out_path):
         print("Requesting {}".format(out_path))
         urllib.request.urlretrieve("https://www.uniprot.org/uniprot/{}".format(file_path), out_path)
     else:
-        print("File already there")
+        print("UniProt file already there", file=sys.stderr)
+    return out_path
 
 if __name__ == "__main__":
 

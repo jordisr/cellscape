@@ -8,6 +8,7 @@ from matplotlib.colors import LinearSegmentedColormap
 import shapely.geometry as sg
 import shapely.ops as so
 import pickle
+import re
 import os
 import sys
 import operator
@@ -19,7 +20,7 @@ from scipy import signal, interpolate
 from scipy.spatial.distance import pdist, squareform
 import time
 
-from .parse_uniprot_xml import parse_xml
+from .parse_uniprot_xml import parse_xml, download_uniprot_record
 from .parse_alignment import align_pair, overlap_from_alignment
 from .util import *
 
@@ -315,7 +316,22 @@ class Cartoon:
         self.ca_atoms = np.array(self.ca_atoms).astype(int)
 
         # uniprot information
-        self._uniprot_xml = uniprot
+        if uniprot is not None:
+            if os.path.exists(uniprot):
+                self._uniprot_xml = uniprot
+            elif re.fullmatch(r'[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}', uniprot):
+                # if file doesn't exist, check it is a valid UniProt ID and download from server
+                # using regex from https://www.uniprot.org/help/accession_numbers
+                try:
+                    self._uniprot_xml = download_uniprot_record(uniprot, "xml", os.getcwd())
+                except:
+                    sys.exit("Couldn't download UniProt file")
+            else:
+                self._uniprot_xml = None
+                sys.exit("Must specify either a UniProt XML file or a valid UniProt ID")
+        else:
+            self._uniprot_xml = None
+
         if self._uniprot_xml is not None:
             self._preprocess_uniprot(self._uniprot_xml)
 
