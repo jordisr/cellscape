@@ -35,7 +35,7 @@ cellscape cartoon --pdb examples/ig/1igt.pdb --view examples/ig/view --outline a
 ```
 
 The `--outline` option specifies which regions of the protein to outline (each residue, each chain, the entire molecule etc).
-In following example we outline each chain separately.
+In the following example we outline each chain separately.
 The `--depth flat` option ensures that if the chains overlap, only the portion that is visible (i.e. closer to the camera) is incorporated into the outline.
 
 ```
@@ -43,7 +43,7 @@ cellscape cartoon --pdb examples/ig/1igt.pdb --view examples/ig/view --outline c
 ```
 
 The most realistic visualization outlines each residue separately.
-Shading by residue depth is used to simulate 3D lightning in a style inspired by [David Goodsell](https://pdb101.rcsb.org/motm/21).
+Shading by residue depth is used to simulate 3D lighting in a style inspired by [David Goodsell](https://pdb101.rcsb.org/motm/21).
 
 ```
 cellscape cartoon --pdb examples/ig/1igt.pdb --view examples/ig/view --outline residue --color_by chain --depth_shading --depth_lines --save outline_residue.svg
@@ -86,7 +86,7 @@ Model 0.0
 
 Re-running the above `cellscape cartoon` examples with the `--export` flag will write each cartoon's data to a Python pickle file, which can then be read by `cellscape scene`.
 
-The simplest usage of `cellscape scene` take a list of pickled cartoons as input and lays them out row, preserving the relative sizes of each protein.
+The simplest usage of `cellscape scene` takes a list of pickled cartoons as input and lays them out in a row, preserving the relative sizes of each protein.
 The `--padding` option specifies how far apart each protein should be (in angstroms).
 
 ```
