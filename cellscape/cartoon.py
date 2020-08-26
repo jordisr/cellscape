@@ -231,7 +231,10 @@ def get_z_slice_labels(xyz, width):
 
 class Cartoon:
     """Main object used to build a molecular cartoon from a PDB structure."""
-    def __init__(self, file, model=0, chain="all", uniprot=None, view=True, is_opm=False):
+    def __init__(self, file, name=None, model=0, chain="all", uniprot=None, view=True, is_opm=False):
+
+        # descriptive name for the protein
+        self.name = name
 
         # check whether outline has been generated yet
         self.outline_by = None
@@ -792,7 +795,7 @@ class Cartoon:
         bottom_coord = min(self.rotated_coord, key=operator.itemgetter(1))
         top_coord = max(self.rotated_coord, key=operator.itemgetter(1))
 
-        data = {'polygons':self._styled_polygons, 'width':image_width, 'height':image_height, 'start':start_coord, 'end':end_coord, 'bottom':bottom_coord, 'top':top_coord}
+        data = {'polygons':self._styled_polygons, 'name':self.name, 'width':image_width, 'height':image_height, 'start':start_coord, 'end':end_coord, 'bottom':bottom_coord, 'top':top_coord}
 
         with open('{}.pickle'.format(fname),'wb') as f:
             pickle.dump(data, f)

@@ -138,11 +138,6 @@ def make_scene(args):
     else:
         y_offsets = np.zeros(len(object_list))
 
-    if args.num_mol is None:
-        num_mol = num_files
-    else:
-        num_mol = args.num_mol
-
     if args.csv:
         # total sum of protein counts
         protein_names = np.array(list(protein_data.keys()))
@@ -150,14 +145,17 @@ def make_scene(args):
         sum_stoich = np.sum(protein_stoich)
         stoich_weights = protein_stoich / sum_stoich
 
-        # protein copy number
-        sampled_protein = np.random.choice(protein_names, size=num_mol, p=stoich_weights)
-        object_list = [protein_data[p][1] for p in sampled_protein]
+        if args.num_mol > 0:
+            # protein copy number
+            sampled_protein = np.random.choice(protein_names, size=args.num_mol, p=stoich_weights)
+            object_list = [protein_data[p][1] for p in sampled_protein]
+        else:
+            object_list = [protein_data[p][1] for p in protein_names]
 
         # assemble objects for background
-        if args.background:
+        if args.background and args.num_mol > 0:
             scaling_factor = 0.7
-            sampled_protein = np.random.choice(protein_names, int(num_mol*1/scaling_factor), p=stoich_weights)
+            sampled_protein = np.random.choice(protein_names, int(args.num_mol*1/scaling_factor), p=stoich_weights)
             background_object_list = [protein_data[p][1] for p in sampled_protein]
     else:
         if 'name' in object_list[0]:
@@ -178,7 +176,11 @@ def make_scene(args):
     matplotlib.rc('font', **font_options)
 
     # set up plot
-    fig, axs = plt.subplots()
+    # POSSIBLE BUG: while coordinates and scale are prserved in the pickle files,
+    # this doesn't necessarily apply to the images. Hence if someone tries to
+    # manually add a protein to a scene that has been generated there could be
+    # sizing issues. Is the solution to use  a constant angstrom/inch scaling?
+    fig, axs = plt.subplots(figsize=(11,8.5))
     axs.set_aspect('equal')
 
     if args.axes:
@@ -218,8 +220,8 @@ def make_scene(args):
     # so colors are by height (what about duplicated molecules)
     # np.random.shuffle(object_list)
 
+    total_width = np.sum([o['width'] for o in object_list])+len(object_list)*args.padding
     if args.membrane is not None:
-        total_width = np.sum([o['width'] for o in object_list])+len(object_list)*args.padding
         membrane = Membrane(width=total_width, axes=axs, thickness=40)
 
         if args.membrane == "flat":
@@ -247,13 +249,14 @@ def make_scene(args):
             plot_polygon(p["polygon"], offset=[w, y_offset], facecolor=facecolor, edgecolor=edgecolor, linewidth=p["linewidth"])
             if args.labels:
                 # option is experimental, text needs to be properly sized and placed
-                if len(object_list) > 20:
-                    fontsize = 5
-                elif len(object_list) > 10:
-                    fontsize = 10
-                else:
-                    fontsize = 15
-                plt.text(w+o['width']/2,-100, o.get("name", ""), rotation=90, fontsize=fontsize)
+                # testing use of figure width in inches (specified above) and total width in angstroms to infer appropriate font size
+                #plt.text(w+o['width']/2,-100, o.get("name", ""), rotation=90, fontsize=fontsize)
+                # 1.1 and 0.6 numbers chosen through experimentation, best way would be to look at length of labels in characters
+                angstroms_per_inch = total_width/11
+                fontsize = total_width*0.6/len(object_list)/angstroms_per_inch*72
+                font_inches = fontsize/72
+                plt.text(w+o['width']/2,-1.1*angstroms_per_inch*font_inches, o.get("name", ""), rotation=90, fontsize=fontsize, va='top', ha='center')
+                #plt.text(w-100,-200, o.get("name", ""), rotation=45, fontsize=fontsize)
         w += o['width']+args.padding
 
     if args.background:

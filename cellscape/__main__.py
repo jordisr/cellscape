@@ -62,7 +62,7 @@ def main():
     parser_scene_sim.add_argument('--csv', help='Table of protein information')
     parser_scene_sim.add_argument('--seed', type=int, help='Random seed for scene generation')
     parser_scene_sim.add_argument('--sample_from', help='Column to use for sampling (with --csv)', default='stoichiometry')
-    parser_scene_sim.add_argument('--num_mol', type=int, help='Total number of molecules in the scene')
+    parser_scene_sim.add_argument('--num_mol', type=int, help='Number of molecules to sample for scene', default=0)
     parser_scene_sim.add_argument('--background', action='store_true', default=False, help='Add background plane using same frequencies')
     parser_scene_sim.add_argument('--labels', action='store_true', default=False, help=argparse.SUPPRESS) # still testing
 

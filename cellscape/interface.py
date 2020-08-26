@@ -17,6 +17,7 @@ import glob
 import csv
 
 from .scene import draw_object
+from .cartoon import plot_polygon
 
 class MembraneInterface:
     """
@@ -46,6 +47,13 @@ class MembraneInterface:
         assert(len(top_y) == len(bottom_y))
 
     def draw(self, color='#C4E7EF'):
+        if isinstance(color, (list,tuple)):
+            top_color = color[0]
+            bot_color = color[1]
+        else:
+            top_color = color
+            bot_color = color
+
         membrane_x = []
         membrane_bot_y = []
         membrane_top_y = []
@@ -67,13 +75,19 @@ class MembraneInterface:
         membrane_top_y = np.array(membrane_top_y)
 
         # plot bottom membrane
-        self.axes.fill_between(membrane_x, membrane_bot_y, membrane_bot_y-self.thickness, color=color, zorder=1.6, capstyle='round', joinstyle='miter')
+        self.axes.fill_between(membrane_x, membrane_bot_y, membrane_bot_y-self.thickness, color=bot_color, zorder=1.6, capstyle='round', joinstyle='miter')
 
         # plot top membrane
-        self.axes.fill_between(membrane_x, membrane_top_y, membrane_top_y+self.thickness, color=color, zorder=1.6, capstyle='round', joinstyle='round')
+        self.axes.fill_between(membrane_x, membrane_top_y, membrane_top_y+self.thickness, color=top_color, zorder=1.6, capstyle='round', joinstyle='round')
 
-def plot_pairs(pairs, thickness=40, padding=50, align="bottom", membrane_color="#E8E8E8", colors=None, axes=True, linewidth=None):
-    fig, axs = plt.subplots()
+def plot_pairs(pairs, thickness=40, padding=50, align="bottom", membrane_color="#E8E8E8", colors=None, axes=True, linewidth=None, labels=None):
+
+    assert align in ["bottom", "middle", "top"]
+
+    if labels is not None:
+        assert len(labels) == len(pairs)
+
+    fig, axs = plt.subplots(figsize=(11,8.5))
     axs.set_aspect('equal')
 
     if axes:
@@ -87,6 +101,10 @@ def plot_pairs(pairs, thickness=40, padding=50, align="bottom", membrane_color="
         plt.margins(0,0)
         plt.gca().xaxis.set_major_locator(plt.NullLocator())
         plt.gca().yaxis.set_major_locator(plt.NullLocator())
+
+    # set font options
+    font_options = {'family':'Arial', 'weight':'normal', 'size':10}
+    matplotlib.rc('font', **font_options)
 
     assert(align in ["top","bottom","middle"])
 
@@ -114,6 +132,8 @@ def plot_pairs(pairs, thickness=40, padding=50, align="bottom", membrane_color="
     bot_y = np.array(bot_y)
     lengths = np.array(lengths)
 
+    total_width = np.sum(lengths)+len(pairs)*padding
+
     # draw membrane
     mem = MembraneInterface(axes=axs, lengths=lengths, bottom_y=bot_y, top_y=top_y, padding=padding, thickness=thickness)
     mem.draw(color=membrane_color)
@@ -131,8 +151,17 @@ def plot_pairs(pairs, thickness=40, padding=50, align="bottom", membrane_color="
         else:
             color_top = None
             color_bot = None
-        draw_object(o1, axs, offset=[w+(this_width-o1['width'])/2, y_offset], color=color_top, linewidth=linewidth)
-        draw_object(o2, axs, offset=[w+(this_width-o2['width'])/2, y_offset+o1['height']], flip=True, color=color_bot, linewidth=linewidth)
+
+        plot_polygon(o1["polygons"][0]['polygon'], axes=axs, offset=[w+(this_width-o1['width'])/2, y_offset], facecolor=o1["polygons"][0]['facecolor'], linewidth=linewidth)
+        plot_polygon(o2["polygons"][0]['polygon'], axes=axs, offset=[w+(this_width-o2['width'])/2, y_offset+o1['height']], flip=True, facecolor=o2["polygons"][0]['facecolor'], linewidth=linewidth)
+
+        if labels is not None:
+            angstroms_per_inch = total_width/11
+            fontsize = total_width*0.3/len(pairs)/angstroms_per_inch*72
+            font_inches = fontsize/72
+            plt.text(w+this_width/2,  y_offset+this_height+50, labels[i][0], rotation=90, fontsize=fontsize, va='bottom', ha='center')
+            plt.text(w+this_width/2, y_offset-1.1*angstroms_per_inch*font_inches, labels[i][1], rotation=90, fontsize=fontsize, va='top', ha='center')
+
         w += this_width+padding
 
     fig.set_size_inches(18.5, 10.5)
