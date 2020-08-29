@@ -80,12 +80,22 @@ class MembraneInterface:
         # plot top membrane
         self.axes.fill_between(membrane_x, membrane_top_y, membrane_top_y+self.thickness, color=top_color, zorder=1.6, capstyle='round', joinstyle='round')
 
-def plot_pairs(pairs, thickness=40, padding=50, align="bottom", membrane_color="#E8E8E8", colors=None, axes=True, linewidth=None, labels=None):
+def plot_pairs(pairs, labels=None, thickness=40, padding=50, align="bottom", membrane_color="#E8E8E8", colors=None, axes=True, linewidth=None, sort=False):
 
     assert align in ["bottom", "middle", "top"]
 
-    if labels is not None:
-        assert len(labels) == len(pairs)
+    # optionally sort proteins by height
+    if sort:
+        pair_heights = np.array(list(map(lambda x: x[0]['height']+x[1]['height'], pairs)))
+        sorted_order = np.argsort(pair_heights)[::-1]
+        pairs_ = [pairs[i] for i in sorted_order]
+        labels_ = [labels[i] for i in sorted_order]
+    else:
+        pairs_ = pairs[:]
+        labels_ = labels[:]
+
+    if labels_ is not None:
+        assert len(labels_) == len(pairs_)
 
     fig, axs = plt.subplots(figsize=(11,8.5))
     axs.set_aspect('equal')
@@ -109,14 +119,14 @@ def plot_pairs(pairs, thickness=40, padding=50, align="bottom", membrane_color="
     assert(align in ["top","bottom","middle"])
 
     # get all the interface heights
-    all_heights = np.array([p[0]['height']+p[1]['height'] for p in pairs])
+    all_heights = np.array([p[0]['height']+p[1]['height'] for p in pairs_])
     max_height = np.max(all_heights)
 
     # calculate membrane geometry
     bot_y = []
     top_y = []
     lengths = []
-    for p in pairs:
+    for p in pairs_:
         o1, o2 = p
         if align == "bottom":
             top_y.append(o1['height']+o2['height'])
@@ -132,7 +142,7 @@ def plot_pairs(pairs, thickness=40, padding=50, align="bottom", membrane_color="
     bot_y = np.array(bot_y)
     lengths = np.array(lengths)
 
-    total_width = np.sum(lengths)+len(pairs)*padding
+    total_width = np.sum(lengths)+len(pairs_)*padding
 
     # draw membrane
     mem = MembraneInterface(axes=axs, lengths=lengths, bottom_y=bot_y, top_y=top_y, padding=padding, thickness=thickness)
@@ -140,7 +150,7 @@ def plot_pairs(pairs, thickness=40, padding=50, align="bottom", membrane_color="
 
     # draw proteins
     w=0
-    for i, o in enumerate(pairs):
+    for i, o in enumerate(pairs_):
         o1, o2 = o
         this_width = max(o1['width'], o2['width'])
         this_height = o1['height']+o2['height']
@@ -155,12 +165,12 @@ def plot_pairs(pairs, thickness=40, padding=50, align="bottom", membrane_color="
         plot_polygon(o1["polygons"][0]['polygon'], axes=axs, offset=[w+(this_width-o1['width'])/2, y_offset], facecolor=o1["polygons"][0]['facecolor'], linewidth=linewidth)
         plot_polygon(o2["polygons"][0]['polygon'], axes=axs, offset=[w+(this_width-o2['width'])/2, y_offset+o1['height']], flip=True, facecolor=o2["polygons"][0]['facecolor'], linewidth=linewidth)
 
-        if labels is not None:
+        if labels_ is not None:
             angstroms_per_inch = total_width/11
-            fontsize = total_width*0.3/len(pairs)/angstroms_per_inch*72
+            fontsize = total_width*0.3/len(pairs_)/angstroms_per_inch*72
             font_inches = fontsize/72
-            plt.text(w+this_width/2,  y_offset+this_height+50, labels[i][0], rotation=90, fontsize=fontsize, va='bottom', ha='center')
-            plt.text(w+this_width/2, y_offset-1.1*angstroms_per_inch*font_inches, labels[i][1], rotation=90, fontsize=fontsize, va='top', ha='center')
+            plt.text(w+this_width/2,  y_offset+this_height+50, labels_[i][0], rotation=90, fontsize=fontsize, va='bottom', ha='center')
+            plt.text(w+this_width/2, y_offset-1.1*angstroms_per_inch*font_inches, labels_[i][1], rotation=90, fontsize=fontsize, va='top', ha='center')
 
         w += this_width+padding
 

@@ -746,7 +746,7 @@ class Cartoon:
         # main plotting loop
         for i, p in enumerate(self._polygons):
             if smoothing:
-                poly_to_draw = smooth_polygon(p[1], level=1)
+                poly_to_draw = smooth_polygon(p[1], level=0)
             else:
                 poly_to_draw = p[1]
 
@@ -757,16 +757,19 @@ class Cartoon:
                 key_for_color = p[0].get(self.outline_by)
             fc = color_map.get(key_for_color, sequential_colors[0])
 
+            shade_value = None
             if depth_shading:
                 #fc = shade_from_color(fc, i/len(self._polygons), range=shading_range)
-                fc = shade_from_color(fc, p[0].get("depth", 0.5), range=shading_range)
+                shade_value = p[0].get("depth", 0.5)
+                fc = shade_from_color(fc, shade_value, range=shading_range)
             if depth_lines:
-                lw = scale_line_width(p[0].get("depth", 0.5), 0, 0.5)
+                shade_value = p[0].get("depth", 0.5)
+                lw = scale_line_width(shade_value, 0, 0.5)
             else:
                 lw = line_width
             plot_polygon(poly_to_draw, facecolor=fc, axes=axs, edgecolor=edge_color, linewidth=lw)
-            # TODO instead of separate variable, just add style info to polygon?
-            self._styled_polygons.append({"polygon":poly_to_draw, "facecolor":fc, "edgecolor":edge_color, "linewidth":lw})
+            # TEST export scaled shading value, that way recolor can in theory choose shades
+            self._styled_polygons.append({"polygon":poly_to_draw, "facecolor":fc, "edgecolor":edge_color, "linewidth":lw, "shade":shade_value})
 
         if save is not None:
             file_ext = os.path.splitext(save)[1].lower()

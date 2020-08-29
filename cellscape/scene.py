@@ -95,7 +95,7 @@ class Membrane:
                 self.axes.add_patch(mpatches.Circle((i*self.head_radius*2, -1*self.thickness+membrane_y), self.head_radius, facecolor=lipid_head_fc, ec='k', linewidth=0.3, alpha=1, zorder=2))
 
         else:
-            membrane_box_fc='silver'
+            membrane_box_fc='#E8E8E8'
             plt.fill_between(membrane_x, membrane_y_top, membrane_y_bot, color=membrane_box_fc, zorder=1.6)
 
 def make_scene(args):
@@ -127,6 +127,9 @@ def make_scene(args):
                     data = pickle.load(f)
                     data['name'] = name
                     data['stoichiometry'] = stoich
+                    # TEST specifying color in CSV file
+                    if 'color' in row:
+                        data['color'] = row['color']
                     protein_data[name] = (stoich, data)
         num_files = len(protein_data)
     else:
@@ -243,9 +246,13 @@ def make_scene(args):
             if args.recolor:
                 facecolor = color_scheme[o['name']]
                 edgecolor = 'black'
+            elif 'color' in o:
+                    facecolor = o['color']
+                    edgecolor = p["edgecolor"]
             else:
-                facecolor = p["facecolor"]
-                edgecolor = p["edgecolor"]
+                    facecolor = p["facecolor"]
+                    edgecolor = p["edgecolor"]
+
             plot_polygon(p["polygon"], offset=[w, y_offset], facecolor=facecolor, edgecolor=edgecolor, linewidth=p["linewidth"])
             if args.labels:
                 # option is experimental, text needs to be properly sized and placed
@@ -253,7 +260,8 @@ def make_scene(args):
                 #plt.text(w+o['width']/2,-100, o.get("name", ""), rotation=90, fontsize=fontsize)
                 # 1.1 and 0.6 numbers chosen through experimentation, best way would be to look at length of labels in characters
                 angstroms_per_inch = total_width/11
-                fontsize = total_width*0.6/len(object_list)/angstroms_per_inch*72
+                # TODO choose relative amount of screen labels take up to specify relative text size e.g. small, medium, large
+                fontsize = total_width*0.5/len(object_list)/angstroms_per_inch*72
                 font_inches = fontsize/72
                 plt.text(w+o['width']/2,-1.1*angstroms_per_inch*font_inches, o.get("name", ""), rotation=90, fontsize=fontsize, va='top', ha='center')
                 #plt.text(w-100,-200, o.get("name", ""), rotation=45, fontsize=fontsize)
