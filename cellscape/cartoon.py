@@ -258,6 +258,14 @@ class Cartoon:
                 if c not in self.chains:
                     self.structure.detach_child(c)
 
+        # BUG with some biopython structures not loading in nglview
+        # can be fixed by resetting disordered flags
+        # could this cause problems later on?
+        for chain in self.structure:
+            for residue in chain:
+                for atom in residue.get_unpacked_list():
+                    atom.disordered_flag = 0
+
         # assumes PDB is oriented as described here:
         # https://opm.phar.umich.edu/about#features
         self.is_opm = is_opm
