@@ -10,7 +10,7 @@ import os, sys, argparse, pickle
 import glob
 import csv
 
-from .cartoon import plot_polygon
+from .cartoon import plot_polygon, shade_from_color
 
 def rotation_matrix_2d(theta):
     """Return matrix to rotate 2D coordinates by angle theta."""
@@ -244,14 +244,21 @@ def make_scene(args):
             y_offset = 0
         for p in o["polygons"]:
             if args.recolor:
-                facecolor = color_scheme[o['name']]
-                edgecolor = 'black'
-            elif 'color' in o:
+                if 'color' in o:
+                    # check if color specified in CSV file
                     facecolor = o['color']
                     edgecolor = p["edgecolor"]
+                else:
+                    # use color scheme from recolor_cmap
+                    facecolor = color_scheme[o['name']]
+                    edgecolor = 'black'
+                if "shade" in p:
+                    # TODO export shading_range from polygons as well
+                    facecolor = shade_from_color(facecolor, p["shade"], range=p.get("shading_range", 0.4)) # using default from cartoon.py, could change
             else:
-                    facecolor = p["facecolor"]
-                    edgecolor = p["edgecolor"]
+                # use color already specified
+                facecolor = p["facecolor"]
+                edgecolor = p["edgecolor"]
 
             plot_polygon(p["polygon"], offset=[w, y_offset], facecolor=facecolor, edgecolor=edgecolor, linewidth=p["linewidth"])
             if args.labels:
@@ -263,7 +270,8 @@ def make_scene(args):
                 # TODO choose relative amount of screen labels take up to specify relative text size e.g. small, medium, large
                 fontsize = total_width*0.5/len(object_list)/angstroms_per_inch*72
                 font_inches = fontsize/72
-                plt.text(w+o['width']/2,-1.1*angstroms_per_inch*font_inches, o.get("name", ""), rotation=90, fontsize=fontsize, va='top', ha='center')
+                plt.text(w+o['width']/2,o['bottom'][1]-1.1*angstroms_per_inch*font_inches, o.get("name", ""), rotation=90, fontsize=fontsize, va='top', ha='center') # vertical text
+                #plt.text(w+o['width']/2,o['top'][1]+2*angstroms_per_inch*font_inches, o.get("name", ""), rotation=0, fontsize=fontsize, va='top', ha='center') # horizontal text
                 #plt.text(w-100,-200, o.get("name", ""), rotation=45, fontsize=fontsize)
         w += o['width']+args.padding
 

@@ -105,6 +105,8 @@ def smooth_polygon(p, level=0):
         return p.simplify(1).buffer(3, join_style=1).buffer(-5, join_style=1).buffer(4, join_style=1)
     elif level == 2:
         return p.simplify(3).buffer(5, join_style=1).buffer(-9, join_style=1).buffer(5, join_style=1)
+    elif level == 3:
+        return p.simplify(0.1).buffer(2, join_style=1)
     else:
         return p
 
@@ -147,7 +149,7 @@ def polygon_to_path(polygon, min_interior_length=40, offset=np.array([0,0]), sca
     transformed_vertices = transform_coord(vertices, offset=offset, scale=scale, flip=flip, recenter=recenter)
     return Path(transformed_vertices, codes)
 
-def plot_polygon(poly, facecolor='orange', edgecolor='k', linewidth=0.7, axes=None, zorder_mod=0, offset=np.array([0,0]), scale=1.0, flip=False, recenter=None, min_area=7):
+def plot_polygon(poly, facecolor='orange', edgecolor='k', linewidth=0.7, axes=None, zorder_mod=0, offset=np.array([0,0]), scale=1.0, flip=False, recenter=None, min_area=7, linestyle='solid'):
     """Draw a Shapely polygon using matplotlib Patches."""
     if axes is None:
         axs = plt.gca()
@@ -157,7 +159,7 @@ def plot_polygon(poly, facecolor='orange', edgecolor='k', linewidth=0.7, axes=No
     if isinstance(poly, sg.polygon.Polygon):
         if poly.area > min_area:
             path = polygon_to_path(poly, offset=offset, scale=scale, flip=flip, recenter=recenter)
-            patch = PathPatch(path, facecolor=facecolor, edgecolor='black', linewidth=linewidth, zorder=3+zorder_mod)
+            patch = PathPatch(path, facecolor=facecolor, edgecolor='black', linewidth=linewidth, zorder=3+zorder_mod, linestyle=linestyle)
             axs.add_patch(patch)
     elif isinstance(poly, sg.multipolygon.MultiPolygon):
         for p in poly:
@@ -292,6 +294,7 @@ class Cartoon:
         self.sequence = dict()
         self.coord = []
         self.ca_atoms = []
+        self.backbone_atoms = []
         all_atoms = 0
         for chain in self.chains:
             self.sequence[chain] = ""
@@ -306,12 +309,16 @@ class Cartoon:
                 self.sequence[chain] += res_aa
                 residue_atoms = 0
                 these_atoms = []
+                backbone_atoms = []
                 for a in res:
                     self.coord.append(list(a.get_vector()))
                     these_atoms.append(a.id) # tracking atom identities for now
                     if a.id == "CA":
                         this_ca_atom = all_atoms
                         self.ca_atoms.append(this_ca_atom)
+                    if a.id in ["CA", "N", "C", "O"]:
+                        backbone_atoms.append(all_atoms)
+                        self.backbone_atoms.append(all_atoms)
                     all_atoms += 1
                     residue_atoms += 1
                 self.residues[chain][res_id] = {
@@ -321,6 +328,7 @@ class Cartoon:
                 'object':res,
                 'coord':(all_atoms-residue_atoms, all_atoms),
                 'coord_ca':(this_ca_atom, this_ca_atom+1),
+                'coord_backbone':np.array(backbone_atoms),
                 'atoms':np.array(these_atoms)
                 }
         self.coord = np.array(self.coord)
@@ -495,7 +503,7 @@ class Cartoon:
         self.view_matrix = m
         self._set_nglview_orientation(self.view_matrix)
 
-    def outline(self, by="all", depth=None, depth_contour_interval=3, only_ca=False, only_annotated=False, radius=None, back_outline=False, align_transmembrane=False):
+    def outline(self, by="all", depth=None, depth_contour_interval=3, only_backbone=False, only_ca=False, only_annotated=False, radius=None, back_outline=False, align_transmembrane=False):
         """Create 2D projection from coordinates and outline atoms."""
 
         # check options
@@ -541,6 +549,8 @@ class Cartoon:
         # default radius for rendering atoms
         if only_ca and radius is None:
             radius_ = 5
+        elif only_backbone and radius is None:
+            radius_ = 4
         elif radius is None:
             radius_ = 1.5
         else:
@@ -551,6 +561,8 @@ class Cartoon:
             self.num_groups = 1
             if only_ca:
                 coord_to_outline = self.rotated_coord[self.ca_atoms]
+            elif only_backbone:
+                coord_to_outline = self.rotated_coord[self.backbone_atoms]
             else:
                 coord_to_outline = self.rotated_coord
             if depth == "contours":
@@ -566,6 +578,8 @@ class Cartoon:
                 # pick range of atomic coordinates out of main data structure
                 if only_ca:
                     res_coords = np.array(self.rotated_coord[range(*res['coord_ca'])])
+                elif only_backbone:
+                    res_coords = np.array(self.rotated_coord[range(*res['coord_backbone'])])
                 else:
                     res_coords = np.array(self.rotated_coord[range(*res['coord'])])
                 res["xyz"] = res_coords
@@ -594,6 +608,8 @@ class Cartoon:
                 for res in v:
                     if only_ca:
                         region_atoms[k].extend(range(*res['coord_ca']))
+                    elif only_backbone:
+                        region_atoms[k].extend(range(*res['coord_backbone']))
                     else:
                         region_atoms[k].extend(range(*res['coord']))
                 region_atoms[k] = np.array(region_atoms[k], dtype=int)
@@ -646,8 +662,16 @@ class Cartoon:
         self.outline_by = by
         print("Outlined {} polygons!".format(len(self._polygons)), file=sys.stderr)
 
+        # image properties (TODO move from export method)
+        self.image_width = np.max(self.rotated_coord[:,0]) - np.min(self.rotated_coord[:,0])
+        self.image_height = np.max(self.rotated_coord[:,1]) - np.min(self.rotated_coord[:,1])
+        self.start_coord = np.mean(self.rotated_coord[:50])
+        self.end_coord = np.mean(self.rotated_coord[:-50])
+        self.bottom_coord = min(self.rotated_coord, key=operator.itemgetter(1))
+        self.top_coord = max(self.rotated_coord, key=operator.itemgetter(1))
+
     def plot(self, colors=None, axes_labels=False, color_residues_by=None, edge_color="black", line_width=0.7,
-        depth_shading=False, depth_lines=False, shading_range=0.4, smoothing=False, do_show=True, axes=None, save=None, dpi=300):
+        depth_shading=False, depth_lines=False, shading_range=0.4, smoothing=False, do_show=True, axes=None, save=None, dpi=300, placeholder=None):
         """
         Style and draw protein cartoon generated from the ``outline`` function.
 
@@ -748,13 +772,22 @@ class Cartoon:
         assert(isinstance(color_map, dict))
 
         if self._back_outline is not None:
-            plot_polygon(self._back_outline, facecolor="None", scale=1.0, axes=axs, edgecolor=edge_color, linewidth=2, zorder_mod=-1)
-            self._styled_polygons.append({"polygon":self._back_outline, "facecolor":"None", "edgecolor":edge_color, "linewidth":1})
+            if smoothing:
+                smoothed_poly = smooth_polygon(self._back_outline, level=3)
+                plot_polygon(smoothed_poly, facecolor="None", scale=1.0, axes=axs, edgecolor=edge_color, linewidth=2, zorder_mod=-1)
+                self._styled_polygons.append({"polygon":smoothed_poly, "facecolor":"None", "edgecolor":edge_color, "linewidth":1})
+            else:
+                plot_polygon(self._back_outline, facecolor="None", scale=1.0, axes=axs, edgecolor=edge_color, linewidth=2, zorder_mod=-1)
+                self._styled_polygons.append({"polygon":self._back_outline, "facecolor":"None", "edgecolor":edge_color, "linewidth":1})
+
+        # TODO optionally show placeholder for unstructured regions
+        if placeholder is not None:
+            plot_polygon(sg.LineString([(self.image_width/2,0),(self.image_width/2,placeholder)]).buffer(25), facecolor="#eeeeee", scale=1.0, axes=axs, edgecolor='black', linestyle='dashed', linewidth=0.5, zorder_mod=-1)
 
         # main plotting loop
         for i, p in enumerate(self._polygons):
             if smoothing:
-                poly_to_draw = smooth_polygon(p[1], level=0)
+                poly_to_draw = smooth_polygon(p[1], level=3)
             else:
                 poly_to_draw = p[1]
 
@@ -764,6 +797,7 @@ class Cartoon:
             else:
                 key_for_color = p[0].get(self.outline_by)
             fc = color_map.get(key_for_color, sequential_colors[0])
+            base_fc = fc # store original color as well as shading
 
             shade_value = None
             if depth_shading:
@@ -776,8 +810,7 @@ class Cartoon:
             else:
                 lw = line_width
             plot_polygon(poly_to_draw, facecolor=fc, axes=axs, edgecolor=edge_color, linewidth=lw)
-            # TEST export scaled shading value, that way recolor can in theory choose shades
-            self._styled_polygons.append({"polygon":poly_to_draw, "facecolor":fc, "edgecolor":edge_color, "linewidth":lw, "shade":shade_value})
+            self._styled_polygons.append({"polygon":poly_to_draw, "facecolor":fc, "edgecolor":edge_color, "linewidth":lw, "shade":shade_value, "base_fc":base_fc})
 
         if save is not None:
             file_ext = os.path.splitext(save)[1].lower()
@@ -798,15 +831,7 @@ class Cartoon:
         else:
             ax = axes
 
-        # output summary line
-        image_width = np.max(self.rotated_coord[:,0]) - np.min(self.rotated_coord[:,0])
-        image_height = np.max(self.rotated_coord[:,1]) - np.min(self.rotated_coord[:,1])
-        start_coord = np.mean(self.rotated_coord[:50])
-        end_coord = np.mean(self.rotated_coord[:-50])
-        bottom_coord = min(self.rotated_coord, key=operator.itemgetter(1))
-        top_coord = max(self.rotated_coord, key=operator.itemgetter(1))
-
-        data = {'polygons':self._styled_polygons, 'name':self.name, 'width':image_width, 'height':image_height, 'start':start_coord, 'end':end_coord, 'bottom':bottom_coord, 'top':top_coord}
+        data = {'polygons':self._styled_polygons, 'name':self.name, 'width':self.image_width, 'height':self.image_height, 'start':self.start_coord, 'end':self.end_coord, 'bottom':self.bottom_coord, 'top':self.top_coord}
 
         with open('{}.pickle'.format(fname),'wb') as f:
             pickle.dump(data, f)

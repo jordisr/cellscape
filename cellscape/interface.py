@@ -83,19 +83,39 @@ class MembraneInterface:
 def plot_pairs(pairs, labels=None, thickness=40, padding=50, align="bottom", membrane_color="#E8E8E8", colors=None, axes=True, linewidth=None, sort=False):
 
     assert align in ["bottom", "middle", "top"]
+    assert sort in [False, "height", "horseshoe"]
+
+    if labels is not None:
+        assert len(labels) == len(pairs)
 
     # optionally sort proteins by height
-    if sort:
+    if sort == "height":
         pair_heights = np.array(list(map(lambda x: x[0]['height']+x[1]['height'], pairs)))
         sorted_order = np.argsort(pair_heights)[::-1]
         pairs_ = [pairs[i] for i in sorted_order]
-        labels_ = [labels[i] for i in sorted_order]
+        if labels is not None:
+            labels_ = [labels[i] for i in sorted_order]
+
+    elif sort == "horseshoe":
+        pair_heights = np.array(list(map(lambda x: x[0]['height']+x[1]['height'], pairs)))
+        sorted_order = np.argsort(pair_heights)[::-1]
+        new_order = np.zeros_like(sorted_order)
+        first_half = sorted_order[::2]
+        if len(sorted_order) % 2:
+            second_half = sorted_order[-2::-2]
+        else:
+            second_half = sorted_order[::-2]
+        new_order[:len(first_half)] = first_half
+        new_order[len(first_half):] = second_half
+
+        pairs_ = [pairs[i] for i in new_order]
+        if labels is not None:
+            labels_ = [labels[i] for i in new_order]
+
     else:
         pairs_ = pairs[:]
-        labels_ = labels[:]
-
-    if labels_ is not None:
-        assert len(labels_) == len(pairs_)
+        if labels is not None:
+            labels_ = labels[:]
 
     fig, axs = plt.subplots(figsize=(11,8.5))
     axs.set_aspect('equal')
