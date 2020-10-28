@@ -119,20 +119,24 @@ def ring_coding(ob):
     codes[0] = Path.MOVETO
     return codes
 
-def transform_coord(xy, offset=np.array([0,0]), scale=1.0, flip=False, recenter=None):
+def placeholder_polygon(height, buffer_width=25, origin=[0,0]):
+    return sg.LineString([(buffer_width+origin[0],0+origin[1]),(buffer_width+origin[0],height+origin[1])]).buffer(buffer_width)
+
+def transform_coord(xy, translate_post=np.array([0,0]), translate_pre=None, scale=1.0, flip=False):
     # 2d coordinates
     xy_ = xy
-    if recenter is not None:
+    if translate_pre is not None:
         # optionally shift coordinates before rotation
-        xy_ -= recenter
+        xy_ += translate_pre
     if flip:
-        xy_ = np.dot(xy_, np.array([[-1,0],[0,-1]]))
-        offset_x = np.min(xy_[:,0])
-        offset_y = np.min(xy_[:,1])
-        xy_ -= np.array([offset_x, offset_y])
-    return (xy_+offset)*scale
+        xy_ = np.dot(xy_, np.array([[-1,0],[0,-1]]).T)
+        #xy_ = np.dot(xy_, np.array([[-1,0],[0,-1]]))
+        #offset_x = np.min(xy_[:,0])
+        #offset_y = np.min(xy_[:,1])
+        #xy_ -= np.array([offset_x, offset_y])
+    return (xy_+translate_post)*scale
 
-def polygon_to_path(polygon, min_interior_length=40, offset=np.array([0,0]), scale=1.0, flip=False, recenter=None):
+def polygon_to_path(polygon, min_interior_length=40, translate_pre=np.array([0,0]), translate_post=np.array([0,0]), scale=1.0, flip=False):
     # generate matplotlib Path object from Shapely polygon
     # filter out small interior holes and apply a scaling factor if desired
     #
@@ -146,10 +150,10 @@ def polygon_to_path(polygon, min_interior_length=40, offset=np.array([0,0]), sca
     codes = np.concatenate(
                 [ring_coding(polygon.exterior)]
                 + [ring_coding(r) for r in interiors])
-    transformed_vertices = transform_coord(vertices, offset=offset, scale=scale, flip=flip, recenter=recenter)
+    transformed_vertices = transform_coord(vertices, translate_pre=translate_pre, translate_post=translate_post, scale=scale, flip=flip)
     return Path(transformed_vertices, codes)
 
-def plot_polygon(poly, facecolor='orange', edgecolor='k', linewidth=0.7, axes=None, zorder_mod=0, offset=np.array([0,0]), scale=1.0, flip=False, recenter=None, min_area=7, linestyle='solid'):
+def plot_polygon(poly, facecolor='orange', edgecolor='k', linewidth=0.7, axes=None, zorder_mod=0, translate_pre=np.array([0,0]), translate_post=np.array([0,0]), scale=1.0, flip=False, recenter=None, min_area=7, linestyle='solid'):
     """Draw a Shapely polygon using matplotlib Patches."""
     if axes is None:
         axs = plt.gca()
@@ -158,12 +162,12 @@ def plot_polygon(poly, facecolor='orange', edgecolor='k', linewidth=0.7, axes=No
         axs = axes
     if isinstance(poly, sg.polygon.Polygon):
         if poly.area > min_area:
-            path = polygon_to_path(poly, offset=offset, scale=scale, flip=flip, recenter=recenter)
+            path = polygon_to_path(poly, translate_pre=translate_pre, translate_post=translate_post, scale=scale, flip=flip)
             patch = PathPatch(path, facecolor=facecolor, edgecolor='black', linewidth=linewidth, zorder=3+zorder_mod, linestyle=linestyle)
             axs.add_patch(patch)
     elif isinstance(poly, sg.multipolygon.MultiPolygon):
         for p in poly:
-            plot_polygon(p, axes=axs, facecolor=facecolor, edgecolor=edgecolor, linewidth=linewidth, scale=scale, zorder_mod=zorder_mod, offset=offset, flip=flip, recenter=recenter)
+            plot_polygon(p, axes=axs, facecolor=facecolor, edgecolor=edgecolor, linewidth=linewidth, scale=scale, zorder_mod=zorder_mod, translate_pre=translate_pre, translate_post=translate_post, flip=flip)
 
 def orientation_from_topology(topologies):
     """Infer protein vertical orientation (N->C or C->N) from UniProt topology annotation."""
@@ -782,7 +786,10 @@ class Cartoon:
 
         # TODO optionally show placeholder for unstructured regions
         if placeholder is not None:
-            plot_polygon(sg.LineString([(self.image_width/2,0),(self.image_width/2,placeholder)]).buffer(25), facecolor="#eeeeee", scale=1.0, axes=axs, edgecolor='black', linestyle='dashed', linewidth=0.5, zorder_mod=-1)
+            placeholder_poly = placeholder_polygon(placeholder-self.image_height, origin=[self.image_width/2-25, self.image_height+25])
+            self._styled_polygons.append({"polygon":placeholder_poly, "facecolor":"None", "shade":0.5, "edgecolor":'black', "linewidth":1})
+            plot_polygon(placeholder_poly, facecolor="#eeeeee", scale=1.0, axes=axs, edgecolor='black', linewidth=1, zorder_mod=-1)
+            self.image_height = 25 + placeholder
 
         # main plotting loop
         for i, p in enumerate(self._polygons):

@@ -10,7 +10,7 @@ import os, sys, argparse, pickle
 import glob
 import csv
 
-from .cartoon import plot_polygon, shade_from_color
+from .cartoon import plot_polygon, shade_from_color, placeholder_polygon
 
 def rotation_matrix_2d(theta):
     """Return matrix to rotate 2D coordinates by angle theta."""
@@ -122,16 +122,23 @@ def make_scene(args):
         with open(args.csv) as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
-                (name, stoich, path) = (row['name'], float(row[args.sample_from]), row['file'])
-                with open(path,'rb') as f:
-                    data = pickle.load(f)
-                    data['name'] = name
-                    data['stoichiometry'] = stoich
-                    # TEST specifying color in CSV file
-                    if 'color' in row:
-                        data['color'] = row['color']
+                (name, stoich, path) = (row['name'], float(row[args.sample_from]), row.get('file'))
+                if path is not "":
+                    with open(path,'rb') as f:
+                        data = pickle.load(f)
+                        data['name'] = name
+                        data['stoichiometry'] = stoich
+                        # TEST specifying color in CSV file
+                        if 'color' in row:
+                            data['color'] = row['color']
+                        protein_data[name] = (stoich, data)
+                elif args.use_placeholders:
+                    height = float(row.get('height'))*10 # assuming in nanometers
+                    data = {'name':name, 'stoichiometry':stoich, 'height':height, 'bottom':np.array([25,0]), 'width':50, 'polygons':[{'polygon':placeholder_polygon(height), 'edgecolor':'k', 'linewidth':1, 'facecolor':"#eeeeee"}]}
                     protein_data[name] = (stoich, data)
+
         num_files = len(protein_data)
+
     else:
         sys.exit("No input files specified, see options with --help")
 
@@ -212,7 +219,7 @@ def make_scene(args):
             # cmap = LinearSegmentedColormap.from_list("cmap", args.recolor_cmap)
             cmap = ListedColormap(args.recolor_cmap)
         color_scheme = dict()
-        for i,c in enumerate(object_list):
+        for i,c in enumerate(sorted(object_list, key=lambda x: x['height'])):
             name = c['name']
             if isinstance(cmap, ListedColormap):
                 color_scheme[name] = cmap(i)
@@ -243,6 +250,7 @@ def make_scene(args):
         else:
             y_offset = 0
         for p in o["polygons"]:
+            # TODO change to dict.get() call to have default
             if args.recolor:
                 if 'color' in o:
                     # check if color specified in CSV file
@@ -260,7 +268,7 @@ def make_scene(args):
                 facecolor = p["facecolor"]
                 edgecolor = p["edgecolor"]
 
-            plot_polygon(p["polygon"], offset=[w, y_offset], facecolor=facecolor, edgecolor=edgecolor, linewidth=p["linewidth"])
+            plot_polygon(p["polygon"], translate_pre=[w, y_offset], facecolor=facecolor, edgecolor=edgecolor, linewidth=p["linewidth"])
             if args.labels:
                 # option is experimental, text needs to be properly sized and placed
                 # testing use of figure width in inches (specified above) and total width in angstroms to infer appropriate font size
@@ -268,7 +276,7 @@ def make_scene(args):
                 # 1.1 and 0.6 numbers chosen through experimentation, best way would be to look at length of labels in characters
                 angstroms_per_inch = total_width/11
                 # TODO choose relative amount of screen labels take up to specify relative text size e.g. small, medium, large
-                fontsize = total_width*0.5/len(object_list)/angstroms_per_inch*72
+                fontsize = total_width*args.label_size/len(object_list)/angstroms_per_inch*72
                 font_inches = fontsize/72
                 plt.text(w+o['width']/2,o['bottom'][1]-1.1*angstroms_per_inch*font_inches, o.get("name", ""), rotation=90, fontsize=fontsize, va='top', ha='center') # vertical text
                 #plt.text(w+o['width']/2,o['top'][1]+2*angstroms_per_inch*font_inches, o.get("name", ""), rotation=0, fontsize=fontsize, va='top', ha='center') # horizontal text

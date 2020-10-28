@@ -182,12 +182,21 @@ def plot_pairs(pairs, labels=None, thickness=40, padding=50, align="bottom", mem
             color_top = None
             color_bot = None
 
-        plot_polygon(o1["polygons"][0]['polygon'], axes=axs, offset=[w+(this_width-o1['width'])/2, y_offset], facecolor=o1["polygons"][0]['facecolor'], linewidth=linewidth)
-        plot_polygon(o2["polygons"][0]['polygon'], axes=axs, offset=[w+(this_width-o2['width'])/2, y_offset+o1['height']], flip=True, facecolor=o2["polygons"][0]['facecolor'], linewidth=linewidth)
+        # TODO rotation needs to be a little cleaner, making some assumptions here
+        for p in o1["polygons"]:
+            xy = np.array(o1['polygons'][0]['polygon'].exterior.xy) # assuming first polygon is outline, TODO fix
+            recenter = np.array([np.min(xy[:,0]), np.min(xy[:,1])])
+            plot_polygon(p['polygon'], axes=axs, translate_pre=[-recenter[0]+w+(this_width-o1['width'])/2, -recenter[1]+y_offset], flip=False, facecolor=p['facecolor'], linewidth=p['linewidth'])
+
+        for p in o2["polygons"]:
+            xy = np.array(o2['polygons'][0]['polygon'].exterior.xy) # assuming first polygon is outline, TODO fix
+            recenter = np.array([np.min(xy[:,0]), np.min(xy[:,1])])
+            plot_polygon(p['polygon'], axes=axs, translate_pre=-1*recenter, translate_post=[w+(this_width+o2['width'])/2, y_offset+10+o2['height']+o1['height']], flip=True, facecolor=p['facecolor'], linewidth=p['linewidth'])
+        #plot_polygon(o2["polygons"][0]['polygon'], axes=axs, offset=[w+(this_width-o2['width'])/2, y_offset+o1['height']], flip=True, facecolor=o2["polygons"][0]['facecolor'], linewidth=linewidth)
 
         if labels_ is not None:
             angstroms_per_inch = total_width/11
-            fontsize = total_width*0.3/len(pairs_)/angstroms_per_inch*72
+            fontsize = total_width*0.5/len(pairs_)/angstroms_per_inch*72
             font_inches = fontsize/72
             plt.text(w+this_width/2,  y_offset+this_height+50, labels_[i][0], rotation=90, fontsize=fontsize, va='bottom', ha='center')
             plt.text(w+this_width/2, y_offset-1.1*angstroms_per_inch*font_inches, labels_[i][1], rotation=90, fontsize=fontsize, va='top', ha='center')
