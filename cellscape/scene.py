@@ -180,6 +180,9 @@ def make_scene(args):
         np.random.shuffle(object_list)
     elif args.order_by == "height":
         object_list = sorted(object_list, key=lambda x: x['height'], reverse=True)
+    elif args.order_by == "top":
+        # TODO should be renamed, maybe length for overall size and height for above membrane?
+        object_list = sorted(object_list, key=lambda x: x['top'][1], reverse=True)
 
     # set font options
     font_options = {'family':'Arial', 'weight':'normal', 'size':10}
@@ -190,7 +193,9 @@ def make_scene(args):
     # this doesn't necessarily apply to the images. Hence if someone tries to
     # manually add a protein to a scene that has been generated there could be
     # sizing issues. Is the solution to use  a constant angstrom/inch scaling?
-    fig, axs = plt.subplots(figsize=(11,8.5))
+    scene_height_in = args.fig_height
+    scene_width_in = args.fig_width
+    fig, axs = plt.subplots(figsize=(scene_width_in, scene_height_in))
     axs.set_aspect('equal')
 
     if args.axes:
@@ -268,13 +273,13 @@ def make_scene(args):
                 facecolor = p["facecolor"]
                 edgecolor = p["edgecolor"]
 
-            plot_polygon(p["polygon"], translate_pre=[w, y_offset], facecolor=facecolor, edgecolor=edgecolor, linewidth=p["linewidth"])
+            plot_polygon(p["polygon"], translate_pre=[w, y_offset], facecolor=facecolor, edgecolor=edgecolor, linewidth=p["linewidth"], zorder_mod=p.get("zorder", 0))
             if args.labels:
                 # option is experimental, text needs to be properly sized and placed
                 # testing use of figure width in inches (specified above) and total width in angstroms to infer appropriate font size
                 #plt.text(w+o['width']/2,-100, o.get("name", ""), rotation=90, fontsize=fontsize)
                 # 1.1 and 0.6 numbers chosen through experimentation, best way would be to look at length of labels in characters
-                angstroms_per_inch = total_width/11
+                angstroms_per_inch = total_width/scene_width_in
                 # TODO choose relative amount of screen labels take up to specify relative text size e.g. small, medium, large
                 fontsize = total_width*args.label_size/len(object_list)/angstroms_per_inch*72
                 font_inches = fontsize/72
@@ -288,7 +293,7 @@ def make_scene(args):
         for i, o in enumerate(background_object_list):
             # draw_object(o, axs, offset=[background_w, 0], scaling=scaling_factor, background=True)
             for p in o["polygons"]:
-                plot_polygon(p["polygon"], offset=[background_w, 0], scale=scaling_factor, facecolor=p["facecolor"], edgecolor=p["edgecolor"], linewidth=p["linewidth"]*scaling_factor, zorder_mod=-2)
+                plot_polygon(p["polygon"], offset=[background_w, 0], scale=scaling_factor, zorder_mod=p.get("zorder", -2), facecolor=p["facecolor"], edgecolor=p["edgecolor"], linewidth=p["linewidth"]*scaling_factor)
             background_w += (o['width']+args.padding)
 
     plt.savefig(args.save, transparent=True, pad_inches=0, bbox_inches='tight', dpi=args.dpi)

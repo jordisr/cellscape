@@ -53,7 +53,7 @@ def main():
     parser_scene_style.add_argument('--axes', action='store_true', default=False, help='Draw x and y axes')
     parser_scene_style.add_argument('--membrane', default=None, choices=[None, 'arc', 'flat', 'wave'], help='Draw membrane on X axis')
     parser_scene_style.add_argument('--membrane_lipids', action='store_true', help='Draw lipid head groups')
-    parser_scene_style.add_argument('--order_by', default='input', choices=['input', 'random', 'height'], help='How to order proteins in scene')
+    parser_scene_style.add_argument('--order_by', default='input', choices=['input', 'random', 'height','top'], help='How to order proteins in scene')
     parser_scene_style.add_argument('--recolor', action='store_true', default=False, help='Recolor proteins in scene')
     parser_scene_style.add_argument('--recolor_cmap', default=['hsv'], nargs='+', help='Named cmap or color scheme for re-coloring')
     parser_scene_style.add_argument('--dpi', type=int, default=300, help='DPI to use if exporting to a raster format like PNG')
@@ -67,6 +67,9 @@ def main():
     parser_scene_sim.add_argument('--background', action='store_true', default=False, help='Add background plane using same frequencies')
     parser_scene_sim.add_argument('--labels', action='store_true', default=False, help=argparse.SUPPRESS) # still testing
     parser_scene_sim.add_argument('--label_size', type=float, default=0.5, help=argparse.SUPPRESS) # fraction of the screen to use for labels
+    parser_scene_sim.add_argument('--label_orientation', choices=["vertical", "horizontal"], default="vertical", help=argparse.SUPPRESS)
+    parser_scene_sim.add_argument('--fig_height', type=float, default=11, help=argparse.SUPPRESS) # passed to figsize
+    parser_scene_sim.add_argument('--fig_width', type=float, default=8.5, help=argparse.SUPPRESS) # passed to figsize
 
     # parse arguments and call corresponding command
     args = parser.parse_args()

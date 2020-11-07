@@ -549,6 +549,7 @@ class Cartoon:
         self._rescale_z = lambda z: (z-np.min(self.rotated_coord[:,-1]))/(np.max(self.rotated_coord[:,-1])-np.min(self.rotated_coord[:,-1]))
         self._polygons = []
         self._styled_polygons = []
+        self._group_outlines = []
 
         # default radius for rendering atoms
         if only_ca and radius is None:
@@ -633,7 +634,26 @@ class Cartoon:
                                 slice_coords = self.rotated_coord[atom_indices][slice_labels[atom_indices] == s]
                                 if len(slice_coords) > 0:
                                     slice_depth = self._rescale_z(np.mean(slice_coords[:,-1]))
-                                    self._polygons.append(({by:group_name, "depth":slice_depth}, so.unary_union([sg.Point(c).buffer(radius_) for c in slice_coords])))
+                                    slice_outline = so.unary_union([sg.Point(c).buffer(radius_) for c in slice_coords])
+                                    self._polygons.append(({by:group_name, "depth":slice_depth}, slice_outline))
+
+                    # back outline to highlight each group's contours... just duplicating depth==flat code here
+                    if back_outline:
+                        empty_polygon = sg.Point((0,0)).buffer(0)
+                        view_object = empty_polygon
+                        region_polygons = dict()
+                        for slice in range(num_slices, 0, -1):
+                            for group_i, (group_name, group_res) in enumerate(sorted(residue_groups.items(), key=lambda x: (x[0] is None, x))):
+                                if not only_annotated or group_name is not None:
+                                    atom_indices = region_atoms[group_name]
+                                    slice_coords = self.rotated_coord[atom_indices][slice_labels[atom_indices] == slice]
+                                    poly = so.unary_union([sg.Point(c).buffer(radius_) for c in slice_coords])
+                                    this_difference = poly.difference(view_object)
+                                    region_polygons[group_name] = region_polygons.get(group_name, empty_polygon).union(this_difference.buffer(0.01))
+                                    view_object = view_object.union(this_difference.buffer(0.01))
+
+                        for v in region_polygons.values():
+                            self._group_outlines.append(v)
 
                 elif depth == "flat":
                     empty_polygon = sg.Point((0,0)).buffer(0)
@@ -734,10 +754,15 @@ class Cartoon:
 
         # parse options and get list of base colors needed for plotting
         if colors is None:
+            # choose default sequential color scheme based on number of colors needed
             if self.num_groups == 1:
                 sequential_colors = [default_color]
+            elif self.num_groups <= 9:
+                sequential_colors = get_sequential_colors(colors="Set1", n=self.num_groups)
+            elif self.num_groups <= 10:
+                sequential_colors = get_sequential_colors(colors="tab10", n=self.num_groups)
             else:
-                sequential_colors = get_sequential_colors(colors=default_cmap, n=self.num_groups)
+                sequential_colors = get_sequential_colors(colors="tab20", n=self.num_groups)
         else:
             if isinstance(colors, dict):
                 sequential_colors = []
@@ -779,10 +804,15 @@ class Cartoon:
             if smoothing:
                 smoothed_poly = smooth_polygon(self._back_outline, level=3)
                 plot_polygon(smoothed_poly, facecolor="None", scale=1.0, axes=axs, edgecolor=edge_color, linewidth=2, zorder_mod=-1)
-                self._styled_polygons.append({"polygon":smoothed_poly, "facecolor":"None", "edgecolor":edge_color, "linewidth":1})
+                self._styled_polygons.append({"polygon":smoothed_poly, "facecolor":"None", "edgecolor":edge_color, "linewidth":2})
             else:
                 plot_polygon(self._back_outline, facecolor="None", scale=1.0, axes=axs, edgecolor=edge_color, linewidth=2, zorder_mod=-1)
-                self._styled_polygons.append({"polygon":self._back_outline, "facecolor":"None", "edgecolor":edge_color, "linewidth":1})
+                self._styled_polygons.append({"polygon":self._back_outline, "facecolor":"None", "edgecolor":edge_color, "linewidth":2})
+
+        if len(self._group_outlines) > 0:
+            for p in self._group_outlines:
+                plot_polygon(p, facecolor="None", scale=1.0, axes=axs, edgecolor=edge_color, linewidth=1, zorder_mod=2)
+                self._styled_polygons.append({"polygon":p, "facecolor":"None", "edgecolor":edge_color, "linewidth":1, "zorder":2})
 
         # TODO optionally show placeholder for unstructured regions
         if placeholder is not None:
