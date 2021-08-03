@@ -16,7 +16,6 @@ import colorsys
 import warnings
 from Bio.PDB import *
 from Bio.PDB.Polypeptide import three_to_one
-from scipy import signal, interpolate
 from scipy.spatial.distance import pdist, squareform
 import time
 
