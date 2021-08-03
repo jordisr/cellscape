@@ -122,7 +122,21 @@ def ring_coding(ob):
 def placeholder_polygon(height, buffer_width=25, origin=[0,0]):
     return sg.LineString([(buffer_width+origin[0],0+origin[1]),(buffer_width+origin[0],height+origin[1])]).buffer(buffer_width)
 
-def transform_coord(xy, translate_post=np.array([0,0]), translate_pre=None, scale=1.0, flip=False):
+def composite_polygon(cartoon, height_before, height_after, buffer_width=25):
+    # placeholder + structure cartoon + placeholder
+    if height_before > 0:
+        before_poly =  placeholder_polygon(height_before, origin=cartoon.bottom_coord[:2]-[buffer_width,height_before], buffer_width=buffer_width)
+        cartoon._styled_polygons.append({"polygon":before_poly, "facecolor":"#eeeeee", "shade":0.5, "edgecolor":'black', "linewidth":1, "zorder":-1})
+
+    if height_after > 0:
+        after_poly =  placeholder_polygon(height_after, origin=cartoon.top_coord[:2]-[buffer_width, 0], buffer_width=buffer_width)
+        cartoon._styled_polygons.append({"polygon":after_poly, "facecolor":"#eeeeee", "shade":0.5, "edgecolor":'black', "linewidth":1, "zorder":-1})
+
+    cartoon.image_height = cartoon.image_height + buffer_width + height_before + height_after
+    cartoon.bottom_coord = cartoon.bottom_coord - np.array([0,height_before,0])
+    cartoon.top_coord = cartoon.top_coord + np.array([0,height_after,0])
+
+def transform_coord(xy, translate_post=np.array([0,0]), translate_pre=np.array([0,0]), scale=1.0, flip=False):
     # 2d coordinates
     xy_ = xy
     if translate_pre is not None:
@@ -237,10 +251,13 @@ def get_z_slice_labels(xyz, width):
 
 class Cartoon:
     """Main object used to build a molecular cartoon from a PDB structure."""
-    def __init__(self, file, name=None, model=0, chain="all", uniprot=None, view=True, is_opm=False):
+    def __init__(self, file, name=None, model=0, chain="all", uniprot=None, view=True, is_opm=False, res_start=None, res_end=None):
 
-        # descriptive name for the protein
-        self.name = name
+        # descriptive name for the protein, otherwise use file
+        if name is None:
+            self.name = os.path.basename(file)
+        else:
+            self.name = name
 
         # check whether outline has been generated yet
         self.outline_by = None
@@ -263,6 +280,14 @@ class Cartoon:
             for c in _all_chains:
                 if c not in self.chains:
                     self.structure.detach_child(c)
+
+        # take chain start and end for first chain
+        if res_start is not None and res_end is not None:
+            assert(res_end > res_start)
+            for res in list(self.structure[_all_chains[0]]):
+                res_id = res.get_full_id()[3][1]
+                if (res_id < res_start) or (res_id > res_end):
+                    self.structure[_all_chains[0]].detach_child(res.get_id())
 
         # BUG with some biopython structures not loading in nglview
         # can be fixed by resetting disordered flags

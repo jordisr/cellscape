@@ -251,7 +251,12 @@ def make_scene(args):
     w=0
     for i, o in enumerate(object_list):
         if args.membrane is not None and not args.no_membrane_offset:
-            y_offset = membrane.height_at(w+o['bottom'][0])-10
+            #y_offset = membrane.height_at(w+o['bottom'][0])-10
+            #y_offset = o['bottom'][1]
+            if o["bottom"][1] < 0:
+                y_offset = -1*o["bottom"][1]
+            else:
+                y_offset = 0
         else:
             y_offset = 0
         for p in o["polygons"]:
@@ -284,7 +289,8 @@ def make_scene(args):
                 font_inches = fontsize/72
                 # TODO better text positioning, allow for top/bottom selection
                 if args.label_orientation == "vertical":
-                    plt.text(w+o['width']/2,o['bottom'][1]-1.1*angstroms_per_inch*font_inches, o.get("name", ""), rotation=90, fontsize=fontsize, va='top', ha='center') # vertical text (below)
+                    #plt.text(w+o['width']/2,o['bottom'][1]-1.1*angstroms_per_inch*font_inches, o.get("name", ""), rotation=90, fontsize=fontsize, va='top', ha='center') # vertical text (below)
+                    plt.text(w+o['width']/2,0-1.1*angstroms_per_inch*font_inches, o.get("name", ""), rotation=90, fontsize=fontsize, va='top', ha='center') # vertical text (below)
                 elif args.label_orientation == "horizontal":
                     plt.text(w+o['width']/2,o['top'][1]+2*angstroms_per_inch*font_inches, o.get("name", ""), rotation=0, fontsize=fontsize, va='top', ha='center') # horizontal text (above)
                 elif args.label_orientation == "diagonal":
