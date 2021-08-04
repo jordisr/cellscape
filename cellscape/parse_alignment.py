@@ -1,6 +1,6 @@
 from Bio import pairwise2
 from Bio.PDB import *
-from Bio.SubsMat.MatrixInfo import blosum62
+from Bio.Align import substitution_matrices
 import numpy as np
 import os, sys, re
 
@@ -27,6 +27,7 @@ def overlap_from_alignment(a):
 
 def align_pair(s1, s2):
     # wrapper for biopython pairwise alignment
+    blosum62 = substitution_matrices.load("BLOSUM62")
     return pairwise2.align.localds(s1, s2, blosum62, -3, -3, one_alignment_only=True)[0]
 
 def align_all_pairs(s):
@@ -34,7 +35,7 @@ def align_all_pairs(s):
         for j in range(i+1, len(s)):
             s1 = s[i][1]
             s2 = s[j][1]
-            alignments = pairwise2.align.localds(s1, s2, blosum62, -3, -3, one_alignment_only=True)
+            alignments = align_pair(s1,s2)
             print(s[i][0], len(s1), s[j][0], len(s2), *overlap_from_alignment(alignments[0]), identity_from_alignment(alignments[0]))
 
 if __name__ == '__main__':
@@ -42,12 +43,15 @@ if __name__ == '__main__':
     '---------AAAAABBBBBBB',
     'BBBBBBBBBAAAAA-------'
     )
-
     print(overlap_from_alignment(a1))
 
     a2 = (
     'BBBBBBBBBAAAAABBBBBBB',
     '---------AAAAA-------'
     )
-
     print(overlap_from_alignment(a2))
+
+    s1 = "AACDAEECDAECDEADAEEAEADADCADEAEAECDDAEACDAECDA"
+    s2 = "ACDAEECDADEADWAEEAEADAWDCADEAEAECGDDAEAGCDACDA"
+    a = align_pair(s1,s2)
+    print(a[0],a[1])

@@ -123,7 +123,7 @@ def make_scene(args):
             reader = csv.DictReader(csvfile)
             for row in reader:
                 (name, stoich, path) = (row['name'], float(row[args.sample_from]), row.get('file'))
-                if path is not "":
+                if path != "":
                     with open(path,'rb') as f:
                         data = pickle.load(f)
                         data['name'] = name
