@@ -205,15 +205,24 @@ def orientation_from_topology(topologies):
             first_cy_flag = False
 
     # rough heuristic for now, works for single pass transmembrane proteins
-    orient_from_topo = 1
+    nc_orient = True
     if first_ex is not None and first_cy is not None:
-        if first_ex[0] > first_cy[0]:
-            orient_from_topo = 1
-        elif first_ex[0] < first_cy[0]:
-            orient_from_topo = -1
+        if first_ex[0] < first_cy[0]:
+            nc_orient = True # N->C (top to bottom)
+        elif first_ex[0] > first_cy[0]:
+            nc_orient = False # C->N (top to bottom)
 
-    print("guessed orientation:{}".format(orient_from_topo))
-    return(orient_from_topo)
+    return(nc_orient)
+
+def orientation_from_ptm(ptm):
+    """Assumes signal peptide is on the cytoplasmic/membrane side with the chain extracellular"""
+
+    nc_orient = True
+    if ('chain' in ptm) and ('signal peptide' in ptm):
+        if ptm['signal peptide'][0] < ptm['chain'][0]:
+            nc_orient = False
+
+    return(nc_orient)
 
 def depth_slices_from_coord(xyz, width):
     # split single xyz Nx3 matrix into list of Nx3 matrices
@@ -439,12 +448,17 @@ class Cartoon:
 
     def auto_view(self, n_atoms=100, c_atoms=100, flip=None):
         if flip is None:
-            if self._uniprot_xml and hasattr(self._uniprot, "topology"):
+            if self._uniprot_xml and len(self._uniprot.topology) > 0:
+                print("orienting based on topology...")
                 nc_orient = orientation_from_topology(self._uniprot.topology)
+            elif self._uniprot_xml and len(self._uniprot.ptm) > 0:
+                print("orienting based on ptm...")
+                nc_orient = orientation_from_ptm(self._uniprot.ptm)
             else:
                 nc_orient = True
         elif isinstance(flip, bool):
             nc_orient = flip
+        print("guessed N>C orientation? {}".format(nc_orient))
 
         # rotate structure so N-C vector is aligned with the vertical axis
         com = np.mean(self.coord, axis=0)
