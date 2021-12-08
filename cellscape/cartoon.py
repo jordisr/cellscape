@@ -135,6 +135,16 @@ def composite_polygon(cartoon, height_before, height_after, buffer_width=25):
     cartoon.bottom_coord = cartoon.bottom_coord - np.array([0,height_before,0])
     cartoon.top_coord = cartoon.top_coord + np.array([0,height_after,0])
 
+def export_placeholder(height, name, fname, buffer_width=25):
+    # placeholder by itself
+    poly =  placeholder_polygon(height, origin=[buffer_width, 0], buffer_width=buffer_width)
+    styled_polygons = [{"polygon":poly, "facecolor":"#eeeeee", "shade":0.5, "edgecolor":'black', "linewidth":1, "zorder":-1}]
+
+    data = {'polygons':styled_polygons, 'name':name, 'width':buffer_width*2, 'height':height+buffer_width, 'start':np.array([buffer_width,0]), 'end':np.array([height+2*buffer_width,0]), 'bottom':np.array([buffer_width,0]), 'top':np.array([height+2*buffer_width,0])}
+
+    with open('{}.pickle'.format(fname),'wb') as f:
+        pickle.dump(data, f)
+
 def transform_coord(xy, translate_post=np.array([0,0]), translate_pre=np.array([0,0]), scale=1.0, flip=False):
     # 2d coordinates
     xy_ = xy
@@ -220,6 +230,8 @@ def orientation_from_ptm(ptm):
     nc_orient = True
     if ('chain' in ptm) and ('signal peptide' in ptm):
         if ptm['signal peptide'][0] < ptm['chain'][0]:
+            nc_orient = True
+        else:
             nc_orient = False
 
     return(nc_orient)
@@ -459,6 +471,7 @@ class Cartoon:
         elif isinstance(flip, bool):
             nc_orient = flip
         print("guessed N>C orientation? {}".format(nc_orient))
+        self.nc_orient = nc_orient
 
         # rotate structure so N-C vector is aligned with the vertical axis
         com = np.mean(self.coord, axis=0)

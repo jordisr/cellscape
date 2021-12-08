@@ -63,6 +63,7 @@ def main():
     parser_scene_style.add_argument('--labels', action='store_true', default=False, help=argparse.SUPPRESS) # still testing
     parser_scene_style.add_argument('--label_size', type=float, default=0.5, help=argparse.SUPPRESS) # fraction of the screen to use for labels
     parser_scene_style.add_argument('--label_orientation', choices=["vertical", "horizontal", "diagonal"], default="vertical", help=argparse.SUPPRESS)
+    parser_scene_style.add_argument('--label_position', choices=["above", "below"], default="below", help=argparse.SUPPRESS)
     parser_scene_style.add_argument('--fig_height', type=float, default=11, help=argparse.SUPPRESS) # passed to figsize
     parser_scene_style.add_argument('--fig_width', type=float, default=8.5, help=argparse.SUPPRESS) # passed to figsize
     # for simulating according to stoichiometry
@@ -72,7 +73,6 @@ def main():
     parser_scene_sim.add_argument('--sample_from', help='Column to use for sampling (with --csv)', default='stoichiometry')
     parser_scene_sim.add_argument('--num_mol', type=int, help='Number of molecules to sample for scene', default=0)
     parser_scene_sim.add_argument('--background', action='store_true', default=False, help='Add background plane using same frequencies')
-
 
     # parse arguments and call corresponding command
     args = parser.parse_args()

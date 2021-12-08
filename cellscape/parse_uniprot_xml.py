@@ -111,7 +111,8 @@ def download_uniprot_record(record, fileformat, outdir):
         print("Requesting {}".format(out_path))
         urllib.request.urlretrieve("https://www.uniprot.org/uniprot/{}".format(file_path), out_path)
     else:
-        print("UniProt file already there", file=sys.stderr)
+        pass
+        #print("UniProt file already there", file=sys.stderr)
     return out_path
 
 if __name__ == "__main__":

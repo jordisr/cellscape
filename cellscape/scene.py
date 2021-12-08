@@ -116,7 +116,12 @@ def make_scene(args):
             with open(path,'rb') as f:
                 data = pickle.load(f)
                 object_list.append(data)
-        num_files = len(args.files)
+
+        # allow random scene generation even if manually specifying files
+        if args.num_mol > 0:
+            object_list = np.random.choice(object_list, size=args.num_mol)
+        num_files = len(object_list)
+
     elif args.csv:
         protein_data = dict()
         with open(args.csv) as csvfile:
