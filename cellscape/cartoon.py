@@ -113,7 +113,8 @@ def ring_coding(ob):
     # https://sgillies.net/2010/04/06/painting-punctured-polygons-with-matplotlib.html
     # The codes will be all "LINETO" commands, except for "MOVETO"s at the
     # beginning of each subpath
-    n = len(ob.coords)
+    #n = len(ob.coords)
+    n = len(np.asarray(ob))
     codes = np.ones(n, dtype=Path.code_type) * Path.LINETO
     codes[0] = Path.MOVETO
     return codes

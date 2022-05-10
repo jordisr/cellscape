@@ -172,8 +172,7 @@ def make_scene(args):
             scaling_factor = 0.7
             sampled_protein = np.random.choice(protein_names, int(args.num_mol*1/scaling_factor), p=stoich_weights)
             background_object_list = [protein_data[p][1] for p in sampled_protein]
-    else:
-        if 'name' in object_list[0]:
+        elif 'name' in object_list[0]:
             protein_names = [o['name'] for o in object_list]
         else:
             for i,o in enumerate(object_list):
