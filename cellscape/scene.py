@@ -16,45 +16,6 @@ def rotation_matrix_2d(theta):
     """Return matrix to rotate 2D coordinates by angle theta."""
     return np.array([[np.cos(theta), -1*np.sin(theta)],[np.sin(theta), np.cos(theta)]])
 
-def draw_object(o, axs, offset=[0,0], flip=False, background=False, scaling=1, zorder=3, recenter=None, color=None, linewidth=None):
-    # older function for adding proteins to membrane visualization
-    # now just use plot_polygon
-
-    # use thinner line with many objects (e.g. with --residues)
-    if linewidth is None:
-        if len(o['polygons']) > 50:
-            lw=0.1
-        else:
-            lw=0.2
-    else:
-        lw = linewidth
-
-    for p in o['polygons']:
-
-        # get polygon coordinates and transform if necessary
-        xy = p.get_xy()
-        if recenter is not None:
-            # optionally shift coordinates before rotation
-            xy -= recenter
-        if flip:
-            # TODO easier to use object height/width if accurate
-            xy = np.dot(xy, np.array([[-1,0],[0,-1]]))
-            offset_x = np.min(xy[:,0])
-            offset_y = np.min(xy[:,1])
-            xy -= np.array([offset_x, offset_y])
-
-        # either use existing color or recolor with global color scheme
-        if color is not None:
-            fc = color
-        else:
-            fc = p.get_facecolor()
-
-        # fill polygon, preset for semi-transparent background layer
-        if not background:
-            axs.fill((xy[:,0]+offset[0])*scaling, (xy[:,1]+offset[1])*scaling, fc=fc, ec='k', linewidth=lw*scaling, zorder=zorder)
-        else:
-            axs.fill((xy[:,0]+offset[0])*scaling, (xy[:,1]+offset[1])*scaling, fc=fc, ec='k', alpha=0.8, linewidth=lw*scaling, zorder=1)
-
 class Membrane:
     def __init__(self, width, thickness, axes, base_y=0):
         self.width = width
@@ -304,7 +265,6 @@ def make_scene(args):
     if args.background:
         background_w=0
         for i, o in enumerate(background_object_list):
-            # draw_object(o, axs, offset=[background_w, 0], scaling=scaling_factor, background=True)
             for p in o["polygons"]:
                 plot_polygon(p["polygon"], offset=[background_w, 0], scale=scaling_factor, zorder_mod=p.get("zorder", -2), facecolor=p["facecolor"], edgecolor=p["edgecolor"], linewidth=p["linewidth"]*scaling_factor)
             background_w += (o['width']+args.padding)
