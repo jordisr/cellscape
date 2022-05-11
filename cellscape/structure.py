@@ -1,20 +1,19 @@
 import numpy as np
 import shapely.geometry as sg
 import shapely.ops as so
-import pickle
 import re
 import os
 import sys
 import operator
 import warnings
-from Bio.PDB import *
+from Bio.PDB import rotmat, vectors, MMCIFParser, PDBParser
 from scipy.spatial.distance import pdist, squareform
 import time
 
-from .parse_uniprot_xml import parse_xml, download_uniprot_record
-from .parse_alignment import align_pair, overlap_from_alignment
-from .util import *
-from .cartoon import Cartoon
+import cellscape
+from cellscape.util import amino_acid_3letter, group_by
+from cellscape.parse_uniprot_xml import parse_xml, download_uniprot_record
+from cellscape.parse_alignment import align_pair, overlap_from_alignment
 
 # silence warnings from Biopython that might pop up when loading the PDB
 from Bio import BiopythonWarning
@@ -76,7 +75,7 @@ def orientation_from_ptm(ptm):
     return(nc_orient)
 
 def depth_slices_from_coord(xyz, width):
-    # split single xyz Nx3 matrix into list of Nx3 matrices
+    """Split single xyz Nx3 matrix into list of Nx3 matrices"""
     binned = (xyz[:,-1]/width).astype(int)
     binned_shifted = binned - np.min(binned)
     num_bins = np.max(binned_shifted)+1
@@ -93,7 +92,7 @@ def depth_slices_from_coord(xyz, width):
     return slice_coords
 
 def get_z_slice_labels(xyz, width):
-    # Take an Nx3 coordinate matrix and return Z bin
+    """Take an Nx3 coordinate matrix and return Z bin"""
     binned = (xyz[:,-1]/width).astype(int)
     return binned - np.min(binned)
 
@@ -119,7 +118,7 @@ def get_dimensions(xy, end_window=50):
     return dimensions
 
 class Structure:
-    """Main object used to build a molecular cartoon from a PDB structure."""
+    """Load PDB/MMCIF structure and handle NGLView instance"""
     def __init__(self, file, name=None, model=0, chain="all", uniprot=None, view=True, is_opm=False, res_start=None, res_end=None):
 
         # descriptive name for the protein, otherwise use file
@@ -127,9 +126,6 @@ class Structure:
             self.name = os.path.basename(file)
         else:
             self.name = name
-
-        # check whether outline has been generated yet
-        self.outline_by = None
 
         # load structure with biopython
         if file[-3:] in ["cif", "mcif"]:
@@ -235,7 +231,6 @@ class Structure:
         # uniprot information
         if uniprot is not None:
             if os.path.exists(uniprot):
-                print("PATH EXISTS")
                 self._uniprot_xml = uniprot
             elif re.fullmatch(r'[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}', uniprot):
                 # if file doesn't exist, check it is a valid UniProt ID and download from server
@@ -291,15 +286,14 @@ class Structure:
         elif len(self.view_matrix) == 0:
             self.view_matrix = np.identity(3)
 
-    # TODO clean up this section
     def align_view(self, v1, v2):
         # rotate structure so v1 is aligned with v2
         r = rotmat(vectors.Vector(v1), vectors.Vector(v2))
-        self.view_matrix = r.T
-        self._set_nglview_orientation(self.view_matrix)
+        view_matrix = r.T
+        self.set_view_matrix(view_matrix)
 
     def align_view_nc(self, n_atoms=10, c_atoms=10, flip=False):
-        # rotate structure so N-C vector is aligned with the vertical axis
+        """Rotate structure so N-C vector is aligned with the vertical axis"""
         com = np.mean(self.coord, axis=0)
         atoms_ = self.coord - com
         v1 = np.mean(atoms_[:n_atoms], axis=0) - np.mean(atoms_[-c_atoms:], axis=0)
@@ -309,6 +303,10 @@ class Structure:
             self.align_view(v1, np.array([0,-1,0]))
 
     def auto_view(self, n_atoms=100, c_atoms=100, flip=None):
+        """Infer orientation from UniProt data."""
+        # TODO should be same as align_view_nc if no UniProt data?
+        # TODO abstract with align_view?
+        # TODO abstract rotmat to separate function e.g. get_rotation_matrix()
         if flip is None:
             if self._uniprot_xml and len(self._uniprot.topology) > 0:
                 print("orienting based on topology...")
@@ -344,8 +342,8 @@ class Structure:
         v2[1] = 0
         second_rotation = rotmat(vectors.Vector(v2), vectors.Vector(np.array([1,0,0]))).T
 
-        self.view_matrix = np.dot(first_rotation, second_rotation)
-        self._set_nglview_orientation(self.view_matrix)
+        view_matrix = np.dot(first_rotation, second_rotation)
+        self.set_view_matrix(view_matrix)
 
     def _set_nglview_orientation(self, m):
         # m is 3x3 rotation matrix
@@ -373,10 +371,8 @@ class Structure:
                 fields = line.split(',')
                 if len(fields) == 4:
                     matrix.append(list(map(float,fields[:3])))
-        self.view_matrix = np.array(matrix)[:3]
-
-        # rotate camera in nglview
-        self._set_nglview_orientation(self.view_matrix)
+        view_matrix = np.array(matrix)[:3]
+        self.set_view_matrix(view_matrix)
 
     def load_chimera_view(self, file):
         """Read rotation matrix from output of Chimera ``matrixset`` command."""
@@ -386,10 +382,8 @@ class Structure:
                 matrix.append(line.split())
 
         # transpose and remove translation vector
-        self.view_matrix = np.array(matrix).astype(float).T[:3]
-
-        # rotate camera in nglview
-        self._set_nglview_orientation(self.view_matrix)
+        view_matrix = np.array(matrix).astype(float).T[:3]
+        self.set_view_matrix(view_matrix)
 
     def save_view_matrix(self, p):
         """Save rotation matrix to a NumPy text file."""
@@ -398,25 +392,23 @@ class Structure:
 
     def load_view_matrix(self, p):
         """Load rotation matrix from a NumPy text file."""
-        self.view_matrix = np.loadtxt(p)
-        self._set_nglview_orientation(self.view_matrix)
+        view_matrix = np.loadtxt(p)
+        self.set_view_matrix(view_matrix)
 
     def set_view_matrix(self, m):
         """Manually set view matrix (3x3)."""
-        # TODO abstract other loading functions to use this (i.e. only call _set_nglview_orientation in this function)
         assert m.shape == (3,3)
         self.view_matrix = m
         self._set_nglview_orientation(self.view_matrix)
 
     def outline(self, by="all", depth=None, depth_contour_interval=3, only_backbone=False, only_ca=False, only_annotated=False, radius=None, back_outline=False, align_transmembrane=False):
         """Create 2D projection from coordinates and outline atoms."""
+        # TODO: expand docstring
 
         # check options
         assert by in ["all", "residue", "chain", "domain", "topology"], "Option not recognized"
         assert depth in [None, "flat", "contours"], "Option not recognized"
         # depth option doesn't affect by="residues"
-
-        self.groups = {}
 
         # collapse chain hierarchy into flat list
         self.residues_flat = [self.residues[c][i] for c in self.residues for i in self.residues[c]]
@@ -450,7 +442,8 @@ class Structure:
                 self.rotated_coord -= np.array([0, tm_com_y, 0])
 
         self._rescale_z = lambda z: (z-np.min(self.rotated_coord[:,-1]))/(np.max(self.rotated_coord[:,-1])-np.min(self.rotated_coord[:,-1]))
-        self._polygons = []
+        polygons = []
+        groups = {}
         self._group_outlines = []
 
         # default radius for rendering atoms
@@ -476,10 +469,10 @@ class Structure:
                 slice_coords = split_on_labels(coord_to_outline, get_z_slice_labels(coord_to_outline, width=depth_contour_interval))
                 for slice in slice_coords:
                     slice_depth = self._rescale_z(np.mean(slice[:,-1]))
-                    self._polygons.append(({"depth":slice_depth}, so.unary_union([sg.Point(i).buffer(radius_) for i in slice])))
+                    polygons.append(({"depth":slice_depth}, so.unary_union([sg.Point(i).buffer(radius_) for i in slice])))
             else:
                 # depth=None and depth=flat are equivalent for by="all"
-                self._polygons.append(({}, so.unary_union([sg.Point(i).buffer(radius_) for i in coord_to_outline])))
+                polygons.append(({}, so.unary_union([sg.Point(i).buffer(radius_) for i in coord_to_outline])))
         else:
             for res in self.residues_flat:
                 # pick range of atomic coordinates out of main data structure
@@ -496,7 +489,7 @@ class Structure:
                 group_outline = so.cascaded_union([sg.Point(i).buffer(radius_) for i in res["xyz"] ])
                 res["polygon"] = group_outline
                 res["depth"] = self._rescale_z(np.mean(res["xyz"][:,-1]))
-                self._polygons.append((res, group_outline))
+                polygons.append((res, group_outline))
             self.num_groups = 1
 
         elif by in ['domain', 'topology', 'chain']:
@@ -506,7 +499,7 @@ class Structure:
 
             # TODO comment code and be consistent with variable names group vs region
             residue_groups = group_by(self.residues_flat, key=lambda x: x.get(by))
-            self.groups = sorted(residue_groups.keys(), key=lambda x: (x is None, x))
+            groups = sorted(residue_groups.keys(), key=lambda x: (x is None, x))
 
             self.num_groups = len(residue_groups)
             region_atoms = dict() # residue group to atomic indices
@@ -537,7 +530,7 @@ class Structure:
                                 if len(slice_coords) > 0:
                                     slice_depth = self._rescale_z(np.mean(slice_coords[:,-1]))
                                     slice_outline = so.unary_union([sg.Point(c).buffer(radius_) for c in slice_coords])
-                                    self._polygons.append(({by:group_name, "depth":slice_depth}, slice_outline))
+                                    polygons.append(({by:group_name, "depth":slice_depth}, slice_outline))
 
                     # back outline to highlight each group's contours... just duplicating depth==flat code here
                     if back_outline:
@@ -572,20 +565,19 @@ class Structure:
                                 view_object = view_object.union(this_difference.buffer(0.01))
 
                     for k,v in region_polygons.items():
-                        self._polygons.append(({by:k}, v))
+                        polygons.append(({by:k}, v))
 
             else:
                 for group_i, (group_name, group_res) in enumerate(residue_groups.items()):
                     if not only_annotated or group_name is not None:
                         group_coords = self.rotated_coord[region_atoms[group_name]]
-                        self._polygons.append(({by:group_name}, so.unary_union([sg.Point(i).buffer(radius_) for i in group_coords])))
+                        polygons.append(({by:group_name}, so.unary_union([sg.Point(i).buffer(radius_) for i in group_coords])))
 
         if back_outline:
-            self._back_outline =  so.unary_union([p[1].buffer(0.01) for p in self._polygons])
+            self._back_outline =  so.unary_union([p[1].buffer(0.01) for p in polygons])
         else:
             self._back_outline = None
 
-        self.outline_by = by
-        print("Outlined {} polygons!".format(len(self._polygons)), file=sys.stderr)
+        print("Outlined {} polygons!".format(len(polygons)), file=sys.stderr)
 
-        return Cartoon(self._polygons, self.residues_flat, self.outline_by, self._back_outline, self._group_outlines, self.num_groups, get_dimensions(self.rotated_coord), self.groups)
+        return cellscape.Cartoon(self.name, polygons, self.residues_flat, by, self._back_outline, self._group_outlines, self.num_groups, get_dimensions(self.rotated_coord), groups)

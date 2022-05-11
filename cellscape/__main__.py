@@ -9,6 +9,7 @@ def main():
     subparsers.required=True
 
     # cartoon
+    # TODO: description for help
     parser_cartoon = subparsers.add_parser('cartoon', help='', formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="")
     parser_cartoon.set_defaults(func=make_cartoon)
     # input/output options
@@ -40,6 +41,7 @@ def main():
     parser_cartoon_style.add_argument('--dpi', type=int, default=300, help='DPI to use if exporting to a raster format like PNG')
 
     # scene
+    # TODO: description for help
     parser_scene = subparsers.add_parser('scene', help='', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser_scene.set_defaults(func=make_scene)
     # input/output options

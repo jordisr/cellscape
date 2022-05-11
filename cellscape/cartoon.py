@@ -13,7 +13,7 @@ import sys
 import colorsys
 from Bio.PDB import *
 
-from .util import *
+import cellscape
 
 def safe_union_accumulate(polys):
     # union of list of shapely polygons
@@ -143,7 +143,7 @@ def polygon_to_path(polygon, min_interior_length=40, translate_pre=np.array([0,0
     transformed_vertices = transform_coord(vertices, translate_pre=translate_pre, translate_post=translate_post, scale=scale, flip=flip)
     return Path(transformed_vertices, codes)
 
-def plot_polygon(poly, facecolor='orange', edgecolor='k', linewidth=0.7, axes=None, zorder_mod=0, translate_pre=np.array([0,0]), translate_post=np.array([0,0]), scale=1.0, flip=False, recenter=None, min_area=7, linestyle='solid'):
+def plot_polygon(poly, facecolor='orange', edgecolor='k', linewidth=0.7, axes=None, zorder_mod=0, translate_pre=np.array([0,0]), translate_post=np.array([0,0]), scale=1.0, flip=False, min_area=7, linestyle='solid'):
     """Draw a Shapely polygon using matplotlib Patches."""
     if axes is None:
         axs = plt.gca()
@@ -160,17 +160,19 @@ def plot_polygon(poly, facecolor='orange', edgecolor='k', linewidth=0.7, axes=No
             plot_polygon(p, axes=axs, facecolor=facecolor, edgecolor=edgecolor, linewidth=linewidth, scale=scale, zorder_mod=zorder_mod, translate_pre=translate_pre, translate_post=translate_post, flip=flip)
 
 class Cartoon:
-    """"""
-    def __init__(self, polygons, residues, outline_by, back_outline, group_outlines, num_groups, dimensions, groups):
+    """Cartoon outline from protein structure"""
+    # TODO: docstring
+    def __init__(self, name, polygons, residues, outline_by, back_outline, group_outlines, num_groups, dimensions, groups):
         # TODO currently just copying over all variables needed, should condense a little
+        self.name = name
         self._polygons = polygons
         self.residues_flat = residues
         self.outline_by = outline_by
         self.num_groups = num_groups
+        self.groups = groups
         self._back_outline = back_outline
         self._group_outlines = group_outlines
         self.dimensions = dimensions
-        self.groups = groups
 
     def plot(self, colors=None, axes_labels=False, color_residues_by=None, edge_color="black", line_width=0.7,
         depth_shading=False, depth_lines=False, shading_range=0.4, smoothing=False, do_show=True, axes=None, save=None, dpi=300, placeholder=None):
@@ -211,10 +213,6 @@ class Cartoon:
             #plt.subplots_adjust(top = 1, bottom = 0, right = 1, left = 0, hspace = 0, wspace = 0)
             #axs.xaxis.set_major_locator(plt.NullLocator())
             #axs.yaxis.set_major_locator(plt.NullLocator())
-    
-        axs.set_aspect('equal')
-        axs.margins(0,0)
-        self._axes= axs
 
         # color schemes
         default_color = 'tab:blue'
@@ -227,7 +225,7 @@ class Cartoon:
                 num_colors_needed = 1
                 residue_color_groups = {"all":self.residues_flat}
             else:
-                residue_color_groups = group_by(self.residues_flat, lambda x: x.get(color_residues_by))
+                residue_color_groups = cellscape.util.group_by(self.residues_flat, lambda x: x.get(color_residues_by))
                 num_colors_needed = len(residue_color_groups)
             self.num_groups = num_colors_needed
 
@@ -328,21 +326,28 @@ class Cartoon:
             plot_polygon(poly_to_draw, facecolor=fc, axes=axs, edgecolor=edge_color, linewidth=lw)
             self._styled_polygons.append({"polygon":poly_to_draw, "facecolor":fc, "edgecolor":edge_color, "linewidth":lw, "shade":shade_value, "base_fc":base_fc})
 
+        axs.set_aspect('equal')
+        axs.margins(0,0)
+        self._axes= axs
+
         if save is not None:
             file_ext = os.path.splitext(save)[1].lower()
             assert file_ext in ['.png','.pdf','.svg','.ps'], "Image file extension not supported"
-            plt.savefig(save, dpi=dpi, transparent=True, pad_inches=0, bbox_inches='tight')
+            #plt.gcf().savefig(save, dpi=dpi, transparent=True, pad_inches=0, bbox_inches='tight')
+            fig.savefig(save, dpi=dpi, transparent=True, pad_inches=0, bbox_inches='tight')
 
         if do_show:
             plt.show()
         else:
             return axs
 
-    def export(self, fname, axes=None):
+    def export(self, fname):
         """Export a pickle object containing styled polygons than can be combined using ``cellscape scene``"""
         assert(len(self._styled_polygons) > 0)
 
-        data = {'polygons':self._styled_polygons, 'name':self.name, 'width':self.image_width, 'height':self.image_height, 'start':self.start_coord, 'end':self.end_coord, 'bottom':self.bottom_coord, 'top':self.top_coord}
+        data = {'polygons':self._styled_polygons, 'name':self.name}
+        for k in ['width', 'height', 'start', 'end', 'top', 'bottom']:
+            data[k] = self.dimensions[k]
 
         with open('{}.pickle'.format(fname),'wb') as f:
             pickle.dump(data, f)
@@ -360,7 +365,7 @@ def make_cartoon(args):
     else:
         chain = ''.join(args.chain)
 
-    molecule = Cartoon(args.pdb, chain=chain, model=args.model, uniprot=args.uniprot, view=False)
+    molecule = cellscape.Structure(args.pdb, chain=chain, model=args.model, uniprot=args.uniprot, view=False)
 
     # open first line to identify view file
     if args.view is not None:
@@ -376,7 +381,15 @@ def make_cartoon(args):
         # if no view matrix provided just use default PDB orientation for now
         molecule.view_matrix = np.identity(3)
 
-    molecule.outline(args.outline_by, depth=args.depth, radius=args.radius, only_annotated=args.only_annotated, only_ca=args.only_ca, depth_contour_interval=args.depth_contour_interval)
+    cartoon = molecule.outline(
+                            args.outline_by, 
+                            depth=args.depth, 
+                            radius=args.radius,
+                            only_annotated=args.only_annotated,
+                            only_ca=args.only_ca,
+                            depth_contour_interval=args.depth_contour_interval
+                            )
+
     if args.outline_by == "residue" and args.color_by != "same":
         color_residues_by = args.color_by
     else:
@@ -386,7 +399,19 @@ def make_cartoon(args):
         colors = args.colors
     else:
         colors = None
-    molecule.plot(do_show=False, axes_labels=args.axes, colors=colors, color_residues_by=color_residues_by, dpi=args.dpi, save=args.save, depth_shading=args.depth_shading, depth_lines=args.depth_lines, edge_color=args.edge_color, line_width=args.line_width)
+    
+    cartoon.plot(
+                do_show=False, 
+                axes_labels=args.axes,
+                colors=colors,
+                color_residues_by=color_residues_by,
+                dpi=args.dpi,
+                save=args.save,
+                depth_shading=args.depth_shading,
+                depth_lines=args.depth_lines,
+                edge_color=args.edge_color,
+                line_width=args.line_width
+                )
 
     if args.export:
-        molecule.export(os.path.splitext(args.save)[0])
+        cartoon.export(os.path.splitext(args.save)[0])

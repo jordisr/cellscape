@@ -6,8 +6,9 @@ import matplotlib.lines as mlines
 from matplotlib import lines, text, cm
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from scipy import interpolate
-import os, sys, argparse, pickle
-import glob
+import os
+import sys
+import pickle
 import csv
 
 from .cartoon import plot_polygon, shade_from_color, placeholder_polygon
@@ -261,7 +262,7 @@ def make_scene(args):
                 elif args.label_orientation == "diagonal":
                     plt.text(w+o['width']/5,o['top'][1]+angstroms_per_inch*font_inches, o.get("name", ""), rotation=45, fontsize=fontsize) # diagonal text (above)
         w += o['width']+args.padding
-
+ 
     if args.background:
         background_w=0
         for i, o in enumerate(background_object_list):
