@@ -1,6 +1,0 @@
-numpy
-matplotlib
-shapely
-biopython
-nglview
-scipy
