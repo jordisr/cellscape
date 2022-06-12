@@ -13,7 +13,7 @@ import time
 import cellscape
 from cellscape.util import amino_acid_3letter, group_by
 from cellscape.parse_uniprot_xml import parse_xml, download_uniprot_record
-from cellscape.parse_alignment import align_pair, overlap_from_alignment
+from cellscape.parse_alignment import align_pair, overlap_from_alignment, sequence_overlap
 
 # silence warnings from Biopython that might pop up when loading the PDB
 from Bio import BiopythonWarning
@@ -258,7 +258,8 @@ class Structure:
         uniprot_seq = self._uniprot.sequence
         first_residue_id = sorted(self.residues[uniprot_chain])[0]
         # alignment coordinates are 0-indexed (but PDB numbering and Uniprot ranges are 1-indexed)
-        self._uniprot_overlap = np.array(overlap_from_alignment(align_pair(uniprot_seq, pdb_seq))) + np.array([1,1,1,1])
+        #self._uniprot_overlap = np.array(overlap_from_alignment(align_pair(uniprot_seq, pdb_seq)))
+        self._uniprot_overlap = np.array(sequence_overlap(uniprot_seq, pdb_seq))
         self._uniprot_offset = self._uniprot_overlap[0] - first_residue_id
 
         if len(self._uniprot.domains) > 0:

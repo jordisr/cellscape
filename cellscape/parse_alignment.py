@@ -1,8 +1,7 @@
 from Bio import pairwise2
 from Bio.PDB import *
-from Bio.Align import substitution_matrices
+from Bio.Align import substitution_matrices, PairwiseAligner
 import numpy as np
-import os, sys, re
 
 def identity_from_alignment(a):
     s1 = np.array(list(a[0]))
@@ -23,7 +22,7 @@ def overlap_from_alignment(a):
     np.where(s1_nogap == overlap_align[0])[1][0],
     np.where(s1_nogap == overlap_align[1])[1][0],
     np.where(s2_nogap == overlap_align[0])[1][0],
-    np.where(s2_nogap == overlap_align[1])[1][0])
+    np.where(s2_nogap == overlap_align[1])[1][0]) + np.array([1,1,1,1])
 
 def align_pair(s1, s2):
     # wrapper for biopython pairwise alignment
@@ -38,18 +37,36 @@ def align_all_pairs(s):
             alignments = align_pair(s1,s2)
             print(s[i][0], len(s1), s[j][0], len(s2), *overlap_from_alignment(alignments[0]), identity_from_alignment(alignments[0]))
 
+def sequence_overlap(s1, s2):
+    aligner = PairwiseAligner()
+    aligner.mode = "global"
+    aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
+    alignments = aligner.align(s1, s2)
+    alignment = list(alignments)[0]
+    alignment_bounds = alignment.aligned
+    return np.array([alignment_bounds[0][0][0], alignment_bounds[0][-1][1], alignment_bounds[-1][0][0], alignment_bounds[-1][-1][1]]) + np.array([1,0,1,0])
+
 if __name__ == '__main__':
     a1 = (
-    '---------AAAAABBBBBBB',
-    'BBBBBBBBBAAAAA-------'
+    '---------AAAAAAAABBBBBBB',
+    'BBBBBBBBBAAAAAAAA-------'
     )
     print(overlap_from_alignment(a1))
+    print(sequence_overlap("AAAAAAAABBBBBBB", "BBBBBBBBBAAAAAAAA"))
 
     a2 = (
     'BBBBBBBBBAAAAABBBBBBB',
     '---------AAAAA-------'
     )
     print(overlap_from_alignment(a2))
+    print(sequence_overlap("BBBBBBBBBAAAAABBBBBBB", "AAAAA"))
+
+    a3 = (
+    'BBBBBBBBBAAAAABBBBAAAABBB',
+    '---------AAAAA----AAAA----'
+    )
+    print(overlap_from_alignment(a3))
+    print(sequence_overlap("BBBBBBBBBAAAAABBBBAAAABBB", "AAAAAAAAA"))
 
     s1 = "AACDAEECDAECDEADAEEAEADADCADEAEAECDDAEACDAECDA"
     s2 = "ACDAEECDADEADWAEEAEADAWDCADEAEAECGDDAEAGCDACDA"
