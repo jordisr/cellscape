@@ -149,6 +149,14 @@ def make_scene(args):
     elif args.order_by == "top":
         # TODO should be renamed, maybe length for overall size and height for above membrane?
         object_list = sorted(object_list, key=lambda x: x['top'][1], reverse=True)
+    elif args.order_by == "membrane":
+        # sorted by maximum height above or below the membrane
+        def max_abs(l1, l2):
+            if abs(l1) > abs(l2):
+                return l1
+            else:
+                return l2
+        object_list = sorted(object_list, key=lambda x: max_abs(x['top'][1], x['bottom'][1]), reverse=True)
 
     # set font options
     font_options = {'family':'Arial', 'weight':'normal', 'size':10}

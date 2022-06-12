@@ -279,16 +279,16 @@ class Cartoon:
         if self._back_outline is not None:
             if smoothing:
                 smoothed_poly = smooth_polygon(self._back_outline, level=3)
-                plot_polygon(smoothed_poly, facecolor="None", scale=1.0, axes=axs, edgecolor=edge_color, linewidth=2, zorder_mod=-1)
-                self._styled_polygons.append({"polygon":smoothed_poly, "facecolor":"None", "edgecolor":edge_color, "linewidth":2})
+                plot_polygon(smoothed_poly, facecolor="None", scale=1.0, axes=axs, edgecolor=edge_color, linewidth=line_width, zorder_mod=-1)
+                self._styled_polygons.append({"polygon":smoothed_poly, "facecolor":"None", "edgecolor":edge_color, "linewidth":line_width})
             else:
-                plot_polygon(self._back_outline, facecolor="None", scale=1.0, axes=axs, edgecolor=edge_color, linewidth=1, zorder_mod=-1)
-                self._styled_polygons.append({"polygon":self._back_outline, "facecolor":"None", "edgecolor":edge_color, "linewidth":1})
+                plot_polygon(self._back_outline, facecolor="None", scale=1.0, axes=axs, edgecolor=edge_color, linewidth=line_width, zorder_mod=-1)
+                self._styled_polygons.append({"polygon":self._back_outline, "facecolor":"None", "edgecolor":edge_color, "linewidth":line_width})
 
         if len(self._group_outlines) > 0:
             for p in self._group_outlines:
-                plot_polygon(p, facecolor="None", scale=1.0, axes=axs, edgecolor=edge_color, linewidth=1, zorder_mod=2)
-                self._styled_polygons.append({"polygon":p, "facecolor":"None", "edgecolor":edge_color, "linewidth":1, "zorder":2})
+                plot_polygon(p, facecolor="None", scale=1.0, axes=axs, edgecolor=edge_color, linewidth=line_width, zorder_mod=2)
+                self._styled_polygons.append({"polygon":p, "facecolor":"None", "edgecolor":edge_color, "linewidth":line_width, "zorder":2})
 
         # TODO optionally show placeholder for unstructured regions
         if placeholder is not None:

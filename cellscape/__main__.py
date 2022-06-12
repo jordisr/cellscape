@@ -57,7 +57,7 @@ def main():
     parser_scene_style.add_argument('--membrane_thickness', default=40, type=float, help='Thickness of the membrane (in angstroms)')
     parser_scene_style.add_argument('--membrane_lipids', action='store_true', help='Draw lipid head groups')
     parser_scene_style.add_argument('--no_membrane_offset', action='store_true', help=argparse.SUPPRESS) # don't adjust y-axis to position bottom of structure in membrane
-    parser_scene_style.add_argument('--order_by', default='input', choices=['input', 'random', 'height','top'], help='How to order proteins in scene')
+    parser_scene_style.add_argument('--order_by', default='input', choices=['input', 'random', 'height','top', 'membrane'], help='How to order proteins in scene')
     parser_scene_style.add_argument('--recolor', action='store_true', default=False, help='Recolor proteins in scene')
     parser_scene_style.add_argument('--recolor_cmap', default=['hsv'], nargs='+', help='Named cmap or color scheme for re-coloring')
     parser_scene_style.add_argument('--dpi', type=int, default=300, help='DPI to use if exporting to a raster format like PNG')
