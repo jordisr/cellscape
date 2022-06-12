@@ -275,9 +275,6 @@ class Structure:
                 if (r-offset) in residues:
                     residues[r-offset][name_key] = name
 
-    def _coord(self, t):
-        return self.coord[t[0]:t[1]]
-
     def _update_view_matrix(self):
         # check if camera orientation has been specified from nglview
         if len(self.view._camera_orientation) == 16:

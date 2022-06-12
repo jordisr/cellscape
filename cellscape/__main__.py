@@ -9,8 +9,7 @@ def main():
     subparsers.required=True
 
     # cartoon
-    # TODO: description for help
-    parser_cartoon = subparsers.add_parser('cartoon', help='', formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="")
+    parser_cartoon = subparsers.add_parser('cartoon', help="Generate protein structure cartoon", formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="Generate protein structure cartoon")
     parser_cartoon.set_defaults(func=make_cartoon)
     # input/output options
     parser_cartoon_io = parser_cartoon.add_argument_group('input/output options')
@@ -27,8 +26,10 @@ def main():
     parser_cartoon_outline.add_argument('--only_ca', action='store_true', default=False, help='Only use alpha carbons for outline')
     parser_cartoon_outline.add_argument('--outline_by', '--outline',  default='all',  choices=['all', 'chain', 'domain', 'topology', 'residue'], help='Outline protein regions')
     parser_cartoon_outline.add_argument('--depth',  default=None,  choices=['flat', 'contours', None], help='Represent depth with flat occluded outlines or contour slices')
-    parser_cartoon_outline.add_argument('--depth_contour_interval',  default=3, help='Width of depth contour bins in angstroms (if --depth contours)')
+    parser_cartoon_outline.add_argument('--depth_contour_interval', type=float, default=3, help='Width of depth contour bins in angstroms (if --depth contours)')
     parser_cartoon_outline.add_argument('--radius', default=1.5, help='Atomic radius, in angstroms', type=float)
+    parser_cartoon_outline.add_argument('--back_outline', action='store_true', help='Outline entire molecule separately from group outlines')
+
     # visual style options
     parser_cartoon_style = parser_cartoon.add_argument_group('styling options')
     parser_cartoon_style.add_argument('--axes', action='store_true', default=False, help='Draw x and y axes around molecule')
@@ -41,8 +42,7 @@ def main():
     parser_cartoon_style.add_argument('--dpi', type=int, default=300, help='DPI to use if exporting to a raster format like PNG')
 
     # scene
-    # TODO: description for help
-    parser_scene = subparsers.add_parser('scene', help='', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser_scene = subparsers.add_parser('scene', help="Compose protein structure cartoons", description="Compose protein structure cartoons", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser_scene.set_defaults(func=make_scene)
     # input/output options
     parser_scene_io = parser_scene.add_argument_group('input/output options')

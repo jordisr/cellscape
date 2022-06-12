@@ -161,7 +161,6 @@ def plot_polygon(poly, facecolor='orange', edgecolor='k', linewidth=0.7, axes=No
 
 class Cartoon:
     """Cartoon outline from protein structure"""
-    # TODO: docstring
     def __init__(self, name, polygons, residues, outline_by, back_outline, group_outlines, num_groups, dimensions, groups):
         # TODO currently just copying over all variables needed, should condense a little
         self.name = name
@@ -283,8 +282,8 @@ class Cartoon:
                 plot_polygon(smoothed_poly, facecolor="None", scale=1.0, axes=axs, edgecolor=edge_color, linewidth=2, zorder_mod=-1)
                 self._styled_polygons.append({"polygon":smoothed_poly, "facecolor":"None", "edgecolor":edge_color, "linewidth":2})
             else:
-                plot_polygon(self._back_outline, facecolor="None", scale=1.0, axes=axs, edgecolor=edge_color, linewidth=2, zorder_mod=-1)
-                self._styled_polygons.append({"polygon":self._back_outline, "facecolor":"None", "edgecolor":edge_color, "linewidth":2})
+                plot_polygon(self._back_outline, facecolor="None", scale=1.0, axes=axs, edgecolor=edge_color, linewidth=1, zorder_mod=-1)
+                self._styled_polygons.append({"polygon":self._back_outline, "facecolor":"None", "edgecolor":edge_color, "linewidth":1})
 
         if len(self._group_outlines) > 0:
             for p in self._group_outlines:
@@ -387,7 +386,8 @@ def make_cartoon(args):
                             radius=args.radius,
                             only_annotated=args.only_annotated,
                             only_ca=args.only_ca,
-                            depth_contour_interval=args.depth_contour_interval
+                            depth_contour_interval=args.depth_contour_interval,
+                            back_outline=args.back_outline
                             )
 
     if args.outline_by == "residue" and args.color_by != "same":
