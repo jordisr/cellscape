@@ -4,7 +4,7 @@ from cellscape.scene import make_scene
 
 def main():
     # set up argument parser
-    parser = argparse.ArgumentParser(description='CellScape: Vector graphics for molecular visualization')
+    parser = argparse.ArgumentParser(description='CellScape: Protein structure visualization with vector graphics cartoons')
     subparsers = parser.add_subparsers(dest="command")
     subparsers.required=True
 
