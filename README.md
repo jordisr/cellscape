@@ -1,5 +1,5 @@
 # CellScape: Protein structure visualization with vector graphics cartoons
-<img src="ig_example.png" alt="logo" width=700/>
+<img src="ig.png" alt="logo" width=700/>
 
 ## Installation
 To run CellScape you will need:
@@ -11,7 +11,6 @@ CellScape and its dependencies can be installed with:
 ```
 git clone https://github.com/jordisr/cellscape
 cd cellscape
-pip install -r requirements.txt
 pip install -e .
 ```
 
@@ -90,7 +89,7 @@ The simplest usage of `cellscape scene` takes a list of pickled cartoons as inpu
 The `--padding` option specifies how far apart each protein should be (in angstroms).
 
 ```
-cellscape scene --files outline_residue.pickle outline_chain.pickle outline_all.pickle --padding 10 --save row.png
+cellscape scene --files outline_residue.pickle outline_chain.pickle outline_all.pickle --padding 10 --save scene.png
 ```
 
 Full description of all options is available by running `cellscape scene -h`.
