@@ -11,7 +11,7 @@ import sys
 import pickle
 import csv
 
-from .cartoon import plot_polygon, shade_from_color, placeholder_polygon
+from cellscape.cartoon import plot_polygon, shade_from_color, placeholder_polygon
 
 def rotation_matrix_2d(theta):
     """Return matrix to rotate 2D coordinates by angle theta."""

@@ -16,7 +16,7 @@ import os, sys, argparse, pickle
 import glob
 import csv
 
-from .cartoon import plot_polygon, shade_from_color
+from cellscape.cartoon import plot_polygon, shade_from_color
 
 class MembraneInterface:
     """

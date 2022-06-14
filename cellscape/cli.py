@@ -1,6 +1,6 @@
-import argparse, sys, os
-from .cartoon import make_cartoon
-from .scene import make_scene
+import argparse
+from cellscape.cartoon import make_cartoon
+from cellscape.scene import make_scene
 
 def main():
     # set up argument parser
@@ -9,7 +9,7 @@ def main():
     subparsers.required=True
 
     # cartoon
-    parser_cartoon = subparsers.add_parser('cartoon', help="Generate protein structure cartoon", formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="Generate protein structure cartoon")
+    parser_cartoon = subparsers.add_parser('cartoon', help="Make a cartoon from a protein structure", formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="Make a cartoon from a protein structure")
     parser_cartoon.set_defaults(func=make_cartoon)
     # input/output options
     parser_cartoon_io = parser_cartoon.add_argument_group('input/output options')
@@ -42,7 +42,7 @@ def main():
     parser_cartoon_style.add_argument('--dpi', type=int, default=300, help='DPI to use if exporting to a raster format like PNG')
 
     # scene
-    parser_scene = subparsers.add_parser('scene', help="Compose protein structure cartoons", description="Compose protein structure cartoons", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser_scene = subparsers.add_parser('scene', help="Compose multiple cartoons together", description="Compose multiple cartoons together", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser_scene.set_defaults(func=make_scene)
     # input/output options
     parser_scene_io = parser_scene.add_argument_group('input/output options')
@@ -79,6 +79,3 @@ def main():
     # parse arguments and call corresponding command
     args = parser.parse_args()
     args.func(args)
-
-if __name__ == "__main__":
-    main()
