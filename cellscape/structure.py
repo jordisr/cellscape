@@ -118,8 +118,21 @@ def get_dimensions(xy, end_window=50):
     return dimensions
 
 class Structure:
-    """Load PDB/MMCIF structure and handle NGLView instance"""
+    """ A class to load coordinates, handle an NGLView instance, and generate cartoons"""
+    #
     def __init__(self, file, name=None, model=0, chain="all", uniprot=None, view=True, is_opm=False, res_start=None, res_end=None):
+        """
+        Args:
+            file (str): Path to PDB/mmCIF coordinates
+            name (str, optional): Descriptive name for structure. Defaults to None.
+            model (int, optional): Model number from structure. Defaults to 0.
+            chain (str, optional): Either "all" or list of chains to include e.g. "ABC". Defaults to "all".
+            uniprot (str, optional): UniProt identifier (to download the record) or the path to a UniProt XML file. Defaults to None.
+            view (bool, optional): Whether to use interactive NGLView widget. Defaults to True.
+            is_opm (bool, optional): Structure is from Orientation of Proteins in Membranes database. Defaults to False.
+            res_start (int, optional): Select subset of protein. Defaults to None.
+            res_end (int, optional): Select subset of protein. Defaults to None.
+        """
 
         # descriptive name for the protein, otherwise use file
         if name is None:
@@ -285,13 +298,25 @@ class Structure:
             self.view_matrix = np.identity(3)
 
     def align_view(self, v1, v2):
+        """Rotate structure so v1 is aligned with v2
+
+        Args:
+            v1 (ndarray): first vector
+            v2 (ndarray): second vector
+        """
         # rotate structure so v1 is aligned with v2
         r = rotmat(vectors.Vector(v1), vectors.Vector(v2))
         view_matrix = r.T
         self.set_view_matrix(view_matrix)
 
     def align_view_nc(self, n_atoms=10, c_atoms=10, flip=False):
-        """Rotate structure so N-C vector is aligned with the vertical axis"""
+        """Rotate structure so N-C vector is aligned with the vertical axis
+
+        Args:
+            n_atoms (int, optional): N terminus CoM calculated from first x atoms. Defaults to 10.
+            c_atoms (int, optional): C terminus CoM calculated from first x atoms. Defaults to 10.
+            flip (bool, optional): Orient C-to-N instead of N-to-C. Defaults to False.
+        """
         com = np.mean(self.coord, axis=0)
         atoms_ = self.coord - com
         v1 = np.mean(atoms_[:n_atoms], axis=0) - np.mean(atoms_[-c_atoms:], axis=0)
@@ -301,7 +326,13 @@ class Structure:
             self.align_view(v1, np.array([0,-1,0]))
 
     def auto_view(self, n_atoms=100, c_atoms=100, flip=None):
-        """Infer orientation from UniProt data."""
+        """Infer protein orientation from UniProt data
+
+        Args:
+            n_atoms (int, optional):  N terminus CoM calculated from first x atoms.. Defaults to 100.
+            c_atoms (int, optional): C terminus CoM calculated from first x atoms. Defaults to 100.
+            flip (bool, optional): Explicitly pass orientation. Defaults to None.
+        """
         # TODO should be same as align_view_nc if no UniProt data?
         # TODO abstract with align_view?
         # TODO abstract rotmat to separate function e.g. get_rotation_matrix()
@@ -362,7 +393,11 @@ class Structure:
         self.rotated_coord = np.dot(self.coord, self.view_matrix)
 
     def load_pymol_view(self, file):
-        """Read rotation matrix from output of PyMol ``get_view`` command."""
+        """Read rotation matrix from output of PyMol ``get_view`` command
+
+        Args:
+            file (str): Path to file
+        """
         matrix = []
         with open(file,'r') as view:
             for line in view:
@@ -373,7 +408,11 @@ class Structure:
         self.set_view_matrix(view_matrix)
 
     def load_chimera_view(self, file):
-        """Read rotation matrix from output of Chimera ``matrixset`` command."""
+        """Read rotation matrix from output of Chimera ``matrixset`` command
+
+        Args:
+            file (str): Path to file
+        """
         matrix = []
         with open(file,'r') as view:
             for line in view.readlines()[1:4]:
@@ -384,29 +423,55 @@ class Structure:
         self.set_view_matrix(view_matrix)
 
     def save_view_matrix(self, p):
-        """Save rotation matrix to a NumPy text file."""
+        """Save rotation matrix to a NumPy text file
+
+        Args:
+            p (str): Path to file
+        """
         self._update_view_matrix()
         np.savetxt(p, self.view_matrix)
 
     def load_view_matrix(self, p):
-        """Load rotation matrix from a NumPy text file."""
+        """Load rotation matrix from a NumPy text file
+
+        Args:
+            p (str): Path to file
+        """
         view_matrix = np.loadtxt(p)
         self.set_view_matrix(view_matrix)
 
     def set_view_matrix(self, m):
-        """Manually set view matrix (3x3)."""
+        """Manually set view matrix
+
+        Args:
+            m (ndarray): 3x3 matrix
+        """
         assert m.shape == (3,3)
         self.view_matrix = m
         self._set_nglview_orientation(self.view_matrix)
 
     def outline(self, by="all", depth=None, depth_contour_interval=3, only_backbone=False, only_ca=False, only_annotated=False, radius=None, back_outline=False, align_transmembrane=False):
-        """Create 2D projection from coordinates and outline atoms."""
-        # TODO: expand docstring
+        """Create 2D projection from coordinates and outline atoms
+
+        Args:
+            by (str, optional): Grouping to use for cartoon. Options are ["all", "residue", "chain", "domain", "topology"]. Defaults to "all".
+            depth (_type_, optional): How to deal with depth/occlusions. Options are ["flat", "contours"]. Defaults to None.
+            depth_contour_interval (float, optional): Size in angstroms of contour slices into the Z-axis. Defaults to 3.
+            only_backbone (bool, optional): Only use backbone atoms for visualization. Defaults to False.
+            only_ca (bool, optional): Only use alpha-carbon atoms for visualization. Defaults to False.
+            only_annotated (bool, optional): Only include residues that have an annotation in UniProt (e.g. domain or topology). Defaults to False.
+            radius (float, optional): Explicitly pass atomic radius, otherwise infer from settings. Defaults to None.
+            back_outline (bool, optional): Draw additional outline of entire structure at the back. Defaults to False.
+            align_transmembrane (bool, optional): Align CoM of annotated transmembrane regions with membrane (requires UniProt data). Defaults to False.
+
+        Returns:
+            Cartoon: Object containing and residue information and outlined polygons
+        """
 
         # check options
         assert by in ["all", "residue", "chain", "domain", "topology"], "Option not recognized"
         assert depth in [None, "flat", "contours"], "Option not recognized"
-        # depth option doesn't affect by="residues"
+        # depth option doesn't affect by="residue"
 
         # collapse chain hierarchy into flat list
         self.residues_flat = [self.residues[c][i] for c in self.residues for i in self.residues[c]]
