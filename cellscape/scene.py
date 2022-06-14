@@ -6,8 +6,9 @@ import matplotlib.lines as mlines
 from matplotlib import lines, text, cm
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from scipy import interpolate
-import os, sys, argparse, pickle
-import glob
+import os
+import sys
+import pickle
 import csv
 
 from .cartoon import plot_polygon, shade_from_color, placeholder_polygon
@@ -15,45 +16,6 @@ from .cartoon import plot_polygon, shade_from_color, placeholder_polygon
 def rotation_matrix_2d(theta):
     """Return matrix to rotate 2D coordinates by angle theta."""
     return np.array([[np.cos(theta), -1*np.sin(theta)],[np.sin(theta), np.cos(theta)]])
-
-def draw_object(o, axs, offset=[0,0], flip=False, background=False, scaling=1, zorder=3, recenter=None, color=None, linewidth=None):
-    # older function for adding proteins to membrane visualization
-    # now just use plot_polygon
-
-    # use thinner line with many objects (e.g. with --residues)
-    if linewidth is None:
-        if len(o['polygons']) > 50:
-            lw=0.1
-        else:
-            lw=0.2
-    else:
-        lw = linewidth
-
-    for p in o['polygons']:
-
-        # get polygon coordinates and transform if necessary
-        xy = p.get_xy()
-        if recenter is not None:
-            # optionally shift coordinates before rotation
-            xy -= recenter
-        if flip:
-            # TODO easier to use object height/width if accurate
-            xy = np.dot(xy, np.array([[-1,0],[0,-1]]))
-            offset_x = np.min(xy[:,0])
-            offset_y = np.min(xy[:,1])
-            xy -= np.array([offset_x, offset_y])
-
-        # either use existing color or recolor with global color scheme
-        if color is not None:
-            fc = color
-        else:
-            fc = p.get_facecolor()
-
-        # fill polygon, preset for semi-transparent background layer
-        if not background:
-            axs.fill((xy[:,0]+offset[0])*scaling, (xy[:,1]+offset[1])*scaling, fc=fc, ec='k', linewidth=lw*scaling, zorder=zorder)
-        else:
-            axs.fill((xy[:,0]+offset[0])*scaling, (xy[:,1]+offset[1])*scaling, fc=fc, ec='k', alpha=0.8, linewidth=lw*scaling, zorder=1)
 
 class Membrane:
     def __init__(self, width, thickness, axes, base_y=0):
@@ -116,7 +78,12 @@ def make_scene(args):
             with open(path,'rb') as f:
                 data = pickle.load(f)
                 object_list.append(data)
-        num_files = len(args.files)
+
+        # allow random scene generation even if manually specifying files
+        if args.num_mol > 0:
+            object_list = np.random.choice(object_list, size=args.num_mol)
+        num_files = len(object_list)
+
     elif args.csv:
         protein_data = dict()
         with open(args.csv) as csvfile:
@@ -167,8 +134,7 @@ def make_scene(args):
             scaling_factor = 0.7
             sampled_protein = np.random.choice(protein_names, int(args.num_mol*1/scaling_factor), p=stoich_weights)
             background_object_list = [protein_data[p][1] for p in sampled_protein]
-    else:
-        if 'name' in object_list[0]:
+        elif 'name' in object_list[0]:
             protein_names = [o['name'] for o in object_list]
         else:
             for i,o in enumerate(object_list):
@@ -183,6 +149,14 @@ def make_scene(args):
     elif args.order_by == "top":
         # TODO should be renamed, maybe length for overall size and height for above membrane?
         object_list = sorted(object_list, key=lambda x: x['top'][1], reverse=True)
+    elif args.order_by == "membrane":
+        # sorted by maximum height above or below the membrane
+        def max_abs(l1, l2):
+            if abs(l1) > abs(l2):
+                return l1
+            else:
+                return l2
+        object_list = sorted(object_list, key=lambda x: max_abs(x['top'][1], x['bottom'][1]), reverse=True)
 
     # set font options
     font_options = {'family':'Arial', 'weight':'normal', 'size':10}
@@ -296,11 +270,10 @@ def make_scene(args):
                 elif args.label_orientation == "diagonal":
                     plt.text(w+o['width']/5,o['top'][1]+angstroms_per_inch*font_inches, o.get("name", ""), rotation=45, fontsize=fontsize) # diagonal text (above)
         w += o['width']+args.padding
-
+ 
     if args.background:
         background_w=0
         for i, o in enumerate(background_object_list):
-            # draw_object(o, axs, offset=[background_w, 0], scaling=scaling_factor, background=True)
             for p in o["polygons"]:
                 plot_polygon(p["polygon"], offset=[background_w, 0], scale=scaling_factor, zorder_mod=p.get("zorder", -2), facecolor=p["facecolor"], edgecolor=p["edgecolor"], linewidth=p["linewidth"]*scaling_factor)
             background_w += (o['width']+args.padding)

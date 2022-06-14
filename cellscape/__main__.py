@@ -9,7 +9,7 @@ def main():
     subparsers.required=True
 
     # cartoon
-    parser_cartoon = subparsers.add_parser('cartoon', help='', formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="")
+    parser_cartoon = subparsers.add_parser('cartoon', help="Generate protein structure cartoon", formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="Generate protein structure cartoon")
     parser_cartoon.set_defaults(func=make_cartoon)
     # input/output options
     parser_cartoon_io = parser_cartoon.add_argument_group('input/output options')
@@ -26,8 +26,10 @@ def main():
     parser_cartoon_outline.add_argument('--only_ca', action='store_true', default=False, help='Only use alpha carbons for outline')
     parser_cartoon_outline.add_argument('--outline_by', '--outline',  default='all',  choices=['all', 'chain', 'domain', 'topology', 'residue'], help='Outline protein regions')
     parser_cartoon_outline.add_argument('--depth',  default=None,  choices=['flat', 'contours', None], help='Represent depth with flat occluded outlines or contour slices')
-    parser_cartoon_outline.add_argument('--depth_contour_interval',  default=3, help='Width of depth contour bins in angstroms (if --depth contours)')
+    parser_cartoon_outline.add_argument('--depth_contour_interval', type=float, default=3, help='Width of depth contour bins in angstroms (if --depth contours)')
     parser_cartoon_outline.add_argument('--radius', default=1.5, help='Atomic radius, in angstroms', type=float)
+    parser_cartoon_outline.add_argument('--back_outline', action='store_true', help='Outline entire molecule separately from group outlines')
+
     # visual style options
     parser_cartoon_style = parser_cartoon.add_argument_group('styling options')
     parser_cartoon_style.add_argument('--axes', action='store_true', default=False, help='Draw x and y axes around molecule')
@@ -40,7 +42,7 @@ def main():
     parser_cartoon_style.add_argument('--dpi', type=int, default=300, help='DPI to use if exporting to a raster format like PNG')
 
     # scene
-    parser_scene = subparsers.add_parser('scene', help='', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser_scene = subparsers.add_parser('scene', help="Compose protein structure cartoons", description="Compose protein structure cartoons", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser_scene.set_defaults(func=make_scene)
     # input/output options
     parser_scene_io = parser_scene.add_argument_group('input/output options')
@@ -55,7 +57,7 @@ def main():
     parser_scene_style.add_argument('--membrane_thickness', default=40, type=float, help='Thickness of the membrane (in angstroms)')
     parser_scene_style.add_argument('--membrane_lipids', action='store_true', help='Draw lipid head groups')
     parser_scene_style.add_argument('--no_membrane_offset', action='store_true', help=argparse.SUPPRESS) # don't adjust y-axis to position bottom of structure in membrane
-    parser_scene_style.add_argument('--order_by', default='input', choices=['input', 'random', 'height','top'], help='How to order proteins in scene')
+    parser_scene_style.add_argument('--order_by', default='input', choices=['input', 'random', 'height','top', 'membrane'], help='How to order proteins in scene')
     parser_scene_style.add_argument('--recolor', action='store_true', default=False, help='Recolor proteins in scene')
     parser_scene_style.add_argument('--recolor_cmap', default=['hsv'], nargs='+', help='Named cmap or color scheme for re-coloring')
     parser_scene_style.add_argument('--dpi', type=int, default=300, help='DPI to use if exporting to a raster format like PNG')
@@ -63,6 +65,7 @@ def main():
     parser_scene_style.add_argument('--labels', action='store_true', default=False, help=argparse.SUPPRESS) # still testing
     parser_scene_style.add_argument('--label_size', type=float, default=0.5, help=argparse.SUPPRESS) # fraction of the screen to use for labels
     parser_scene_style.add_argument('--label_orientation', choices=["vertical", "horizontal", "diagonal"], default="vertical", help=argparse.SUPPRESS)
+    parser_scene_style.add_argument('--label_position', choices=["above", "below"], default="below", help=argparse.SUPPRESS)
     parser_scene_style.add_argument('--fig_height', type=float, default=11, help=argparse.SUPPRESS) # passed to figsize
     parser_scene_style.add_argument('--fig_width', type=float, default=8.5, help=argparse.SUPPRESS) # passed to figsize
     # for simulating according to stoichiometry
@@ -72,7 +75,6 @@ def main():
     parser_scene_sim.add_argument('--sample_from', help='Column to use for sampling (with --csv)', default='stoichiometry')
     parser_scene_sim.add_argument('--num_mol', type=int, help='Number of molecules to sample for scene', default=0)
     parser_scene_sim.add_argument('--background', action='store_true', default=False, help='Add background plane using same frequencies')
-
 
     # parse arguments and call corresponding command
     args = parser.parse_args()

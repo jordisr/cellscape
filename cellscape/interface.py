@@ -16,8 +16,7 @@ import os, sys, argparse, pickle
 import glob
 import csv
 
-from .scene import draw_object
-from .cartoon import plot_polygon
+from .cartoon import plot_polygon, shade_from_color
 
 class MembraneInterface:
     """
@@ -111,6 +110,8 @@ def plot_pairs(pairs, labels=None, thickness=40, padding=50, align="bottom", mem
         pairs_ = [pairs[i] for i in new_order]
         if labels is not None:
             labels_ = [labels[i] for i in new_order]
+        if colors is not None:
+            colors_ = [colors[i] for i in new_order]
 
     else:
         pairs_ = pairs[:]
@@ -176,8 +177,8 @@ def plot_pairs(pairs, labels=None, thickness=40, padding=50, align="bottom", mem
         this_height = o1['height']+o2['height']
         y_offset = bot_y[i]
         if colors is not None:
-            color_top = colors[0][i]
-            color_bot = colors[1][i]
+            color_top = colors_[i][1]
+            color_bot = colors_[i][0]
         else:
             color_top = None
             color_bot = None
@@ -186,20 +187,22 @@ def plot_pairs(pairs, labels=None, thickness=40, padding=50, align="bottom", mem
         for p in o1["polygons"]:
             xy = np.array(o1['polygons'][0]['polygon'].exterior.xy) # assuming first polygon is outline, TODO fix
             recenter = np.array([np.min(xy[:,0]), np.min(xy[:,1])])
-            plot_polygon(p['polygon'], axes=axs, translate_pre=[-recenter[0]+w+(this_width-o1['width'])/2, -recenter[1]+y_offset], flip=False, facecolor=p['facecolor'], linewidth=p['linewidth'])
+            facecolor = shade_from_color(color_bot, p.get("shade", 0.5), range=p.get("shading_range", 0.4))
+            plot_polygon(p['polygon'], axes=axs, translate_pre=[-recenter[0]+w+(this_width-o1['width'])/2, -recenter[1]+y_offset], flip=False, facecolor=facecolor, linewidth=p['linewidth'])
 
         for p in o2["polygons"]:
             xy = np.array(o2['polygons'][0]['polygon'].exterior.xy) # assuming first polygon is outline, TODO fix
             recenter = np.array([np.min(xy[:,0]), np.min(xy[:,1])])
-            plot_polygon(p['polygon'], axes=axs, translate_pre=-1*recenter, translate_post=[w+(this_width+o2['width'])/2, y_offset+10+o2['height']+o1['height']], flip=True, facecolor=p['facecolor'], linewidth=p['linewidth'])
+            facecolor = shade_from_color(color_top, p.get("shade", 0.5), range=p.get("shading_range", 0.4))
+            plot_polygon(p['polygon'], axes=axs, translate_pre=-1*recenter, translate_post=[w+(this_width+o2['width'])/2, y_offset+10+o2['height']+o1['height']], flip=True, facecolor=facecolor, linewidth=p['linewidth'])
         #plot_polygon(o2["polygons"][0]['polygon'], axes=axs, offset=[w+(this_width-o2['width'])/2, y_offset+o1['height']], flip=True, facecolor=o2["polygons"][0]['facecolor'], linewidth=linewidth)
 
         if labels_ is not None:
             angstroms_per_inch = total_width/11
             fontsize = total_width*0.5/len(pairs_)/angstroms_per_inch*72
             font_inches = fontsize/72
-            plt.text(w+this_width/2,  y_offset+this_height+50, labels_[i][0], rotation=90, fontsize=fontsize, va='bottom', ha='center')
-            plt.text(w+this_width/2, y_offset-1.1*angstroms_per_inch*font_inches, labels_[i][1], rotation=90, fontsize=fontsize, va='top', ha='center')
+            plt.text(w+this_width/2,  y_offset+this_height+50, labels_[i][1], rotation=90, fontsize=fontsize, va='bottom', ha='center')
+            plt.text(w+this_width/2, y_offset-1.1*angstroms_per_inch*font_inches, labels_[i][0], rotation=90, fontsize=fontsize, va='top', ha='center')
 
         w += this_width+padding
 
