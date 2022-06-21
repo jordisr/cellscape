@@ -69,16 +69,16 @@ def placeholder_polygon(height, buffer_width=25, origin=[0,0]):
 def composite_polygon(cartoon, height_before, height_after, buffer_width=25):
     # placeholder + structure cartoon + placeholder
     if height_before > 0:
-        before_poly =  placeholder_polygon(height_before, origin=cartoon.bottom_coord[:2]-[buffer_width,height_before], buffer_width=buffer_width)
+        before_poly =  placeholder_polygon(height_before, origin=cartoon.dimensions['bottom'][:2]-[buffer_width,height_before], buffer_width=buffer_width)
         cartoon._styled_polygons.append({"polygon":before_poly, "facecolor":"#eeeeee", "shade":0.5, "edgecolor":'black', "linewidth":1, "zorder":-1})
 
     if height_after > 0:
-        after_poly =  placeholder_polygon(height_after, origin=cartoon.top_coord[:2]-[buffer_width, 0], buffer_width=buffer_width)
+        after_poly =  placeholder_polygon(height_after, origin=cartoon.dimensions['top'][:2]-[buffer_width, 0], buffer_width=buffer_width)
         cartoon._styled_polygons.append({"polygon":after_poly, "facecolor":"#eeeeee", "shade":0.5, "edgecolor":'black', "linewidth":1, "zorder":-1})
 
-    cartoon.image_height = cartoon.image_height + buffer_width + height_before + height_after
-    cartoon.bottom_coord = cartoon.bottom_coord - np.array([0,height_before,0])
-    cartoon.top_coord = cartoon.top_coord + np.array([0,height_after,0])
+    cartoon.dimensions['height'] = cartoon.dimensions['height'] + buffer_width + height_before + height_after
+    cartoon.dimensions['bottom'] = cartoon.dimensions['bottom'] - np.array([0,height_before,0])
+    cartoon.dimensions['top'] = cartoon.dimensions['top'] + np.array([0,height_after,0])
 
 def export_placeholder(height, name, fname, buffer_width=25):
     # placeholder by itself
@@ -285,10 +285,10 @@ class Cartoon:
 
         # TODO optionally show placeholder for unstructured regions
         if placeholder is not None:
-            placeholder_poly = placeholder_polygon(placeholder-self.image_height, origin=[self.image_width/2-25, self.image_height+25])
+            placeholder_poly = placeholder_polygon(placeholder-self.dimensions['height'], origin=[self.image_width/2-25, self.dimensions['height']+25])
             self._styled_polygons.append({"polygon":placeholder_poly, "facecolor":"None", "shade":0.5, "edgecolor":'black', "linewidth":1})
             plot_polygon(placeholder_poly, facecolor="#eeeeee", scale=1.0, axes=axs, edgecolor='black', linewidth=1, zorder_mod=-1)
-            self.image_height = 25 + placeholder
+            self.dimensions['height'] = 25 + placeholder
 
         # main plotting loop
         for i, p in enumerate(self._polygons):

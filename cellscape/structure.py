@@ -162,10 +162,13 @@ class Structure:
         # take chain start and end for first chain
         if res_start is not None and res_end is not None:
             assert(res_end > res_start)
-            for res in list(self.structure[_all_chains[0]]):
+            residues_to_remove = []
+            for res in self.structure[_all_chains[0]]:
                 res_id = res.get_full_id()[3][1]
                 if (res_id < res_start) or (res_id > res_end):
-                    self.structure[_all_chains[0]].detach_child(res.get_id())
+                    residues_to_remove.append(res.get_id())
+            for res_id in residues_to_remove:
+                self.structure[_all_chains[0]].detach_child(res_id)
 
         # BUG with some biopython structures not loading in nglview
         # can be fixed by resetting disordered flags
@@ -274,6 +277,7 @@ class Structure:
         #self._uniprot_overlap = np.array(overlap_from_alignment(align_pair(uniprot_seq, pdb_seq)))
         self._uniprot_overlap = np.array(sequence_overlap(uniprot_seq, pdb_seq))
         self._uniprot_offset = self._uniprot_overlap[0] - first_residue_id
+        #print(self._uniprot_overlap, self._uniprot_offset)
 
         if len(self._uniprot.domains) > 0:
             self._annotate_residues_from_uniprot(self._uniprot.domains, name_key="domain", residues=self.residues[uniprot_chain], offset=self._uniprot_offset)

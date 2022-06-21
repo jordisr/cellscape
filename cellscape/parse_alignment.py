@@ -42,7 +42,7 @@ def sequence_overlap(s1, s2):
     aligner.mode = "global"
     aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
     alignments = aligner.align(s1, s2)
-    alignment = list(alignments)[0]
+    alignment = next(alignments)
     alignment_bounds = alignment.aligned
     return np.array([alignment_bounds[0][0][0], alignment_bounds[0][-1][1], alignment_bounds[-1][0][0], alignment_bounds[-1][-1][1]]) + np.array([1,0,1,0])
 
