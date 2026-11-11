@@ -192,7 +192,7 @@ def make_scene(args):
     if args.recolor:
         # default cmap is hsv. for discrete could try Set1 or Pastel1
         if len(args.recolor_cmap) == 1:
-            cmap = cm.get_cmap(args.recolor_cmap[0])
+            cmap = matplotlib.colormaps[args.recolor_cmap[0]]
         else:
             # TESTING interpret as continous color scheme
             # cmap = LinearSegmentedColormap.from_list("cmap", args.recolor_cmap)

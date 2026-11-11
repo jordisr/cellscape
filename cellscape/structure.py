@@ -549,7 +549,7 @@ class Structure:
 
         if by == 'residue':
             for res in sorted(self.residues_flat, key=lambda res: np.mean(res["xyz"][:,-1])):
-                group_outline = so.cascaded_union([sg.Point(i).buffer(radius_) for i in res["xyz"] ])
+                group_outline = so.unary_union([sg.Point(i).buffer(radius_) for i in res["xyz"] ])
                 res["polygon"] = group_outline
                 res["depth"] = self._rescale_z(np.mean(res["xyz"][:,-1]))
                 polygons.append((res, group_outline))
