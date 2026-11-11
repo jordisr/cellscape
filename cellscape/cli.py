@@ -13,9 +13,9 @@ def main():
     parser_cartoon.set_defaults(func=make_cartoon)
     # input/output options
     parser_cartoon_io = parser_cartoon.add_argument_group('input/output options')
-    parser_cartoon_io.add_argument('--pdb', help='Protein coordinates file (must be .pdb/.ent/.cif/.mcif)', required=True)
+    parser_cartoon_io.add_argument('--pdb', help='Protein coordinates file (.pdb/.ent/.cif/.mcif/.mmcif, optionally gzipped)', required=True)
     parser_cartoon_io.add_argument('--model', type=int, default=0, help='Model number in PDB to load')
-    parser_cartoon_io.add_argument('--chain', default=['all'], help='Chain(s) in structure to outline', nargs='+')
+    parser_cartoon_io.add_argument('--chain', default=['all'], help='Chain ID(s) in structure to outline, e.g. --chain A B or --chain AA (multi-letter IDs are matched whole)', nargs='+')
     parser_cartoon_io.add_argument('--view', help='Camera rotation matrix (saved from cellscape, PyMOL get_view, or Chimera matrixget)')
     parser_cartoon_io.add_argument('--uniprot', help='UniProt XML file to parse for sequence/domain/topology information')
     parser_cartoon_io.add_argument('--save', default='out.svg', help='Image output file (valid formats are png/pdf/svg/ps)')

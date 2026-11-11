@@ -192,7 +192,7 @@ def make_scene(args):
     if args.recolor:
         # default cmap is hsv. for discrete could try Set1 or Pastel1
         if len(args.recolor_cmap) == 1:
-            cmap = cm.get_cmap(args.recolor_cmap[0])
+            cmap = matplotlib.colormaps[args.recolor_cmap[0]]
         else:
             # TESTING interpret as continous color scheme
             # cmap = LinearSegmentedColormap.from_list("cmap", args.recolor_cmap)
@@ -244,7 +244,7 @@ def make_scene(args):
                     # use color scheme from recolor_cmap
                     facecolor = color_scheme[o['name']]
                     edgecolor = 'black'
-                if "shade" in p:
+                if p.get("shade") is not None:
                     # TODO export shading_range from polygons as well
                     facecolor = shade_from_color(facecolor, p["shade"], range=p.get("shading_range", 0.4)) # using default from cartoon.py, could change
             else:

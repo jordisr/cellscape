@@ -31,7 +31,7 @@ def get_sequential_colors(colors='Set1', n=1):
     Sample n colors sequentially from a named matplotlib ColorMap.
     """
     # uses matplotlib.colors.ColorMap.N to distinguish continuous/discrete
-    cmap = matplotlib.cm.get_cmap(colors)
+    cmap = matplotlib.colormaps[colors]
     if cmap.N == 256:
         # continuous color map
         sequential_colors = [cmap(x) for x in np.linspace(0.0,1.0, n)]
@@ -58,7 +58,7 @@ def ring_coding(ob):
     # The codes will be all "LINETO" commands, except for "MOVETO"s at the
     # beginning of each subpath
     #n = len(ob.coords)
-    n = len(np.asarray(ob))
+    n = len(ob.coords)
     codes = np.ones(n, dtype=Path.code_type) * Path.LINETO
     codes[0] = Path.MOVETO
     return codes
@@ -113,8 +113,8 @@ def polygon_to_path(polygon, min_interior_length=40, translate_pre=np.array([0,0
     # analytic methods have the proper coordinate order, no need to sort.
     interiors = list(filter(lambda x: x.length > min_interior_length, polygon.interiors))
     vertices = np.concatenate(
-                    [np.asarray(polygon.exterior)]
-                    + [np.asarray(r) for r in interiors])
+                    [np.asarray(polygon.exterior.coords)[:, :2]]
+                    + [np.asarray(r.coords)[:, :2] for r in interiors])
     codes = np.concatenate(
                 [ring_coding(polygon.exterior)]
                 + [ring_coding(r) for r in interiors])
@@ -128,13 +128,13 @@ def plot_polygon(poly, facecolor='orange', edgecolor='k', linewidth=0.7, axes=No
         axs.set_aspect('equal')
     else:
         axs = axes
-    if isinstance(poly, sg.polygon.Polygon):
+    if isinstance(poly, sg.Polygon):
         if poly.area > min_area:
             path = polygon_to_path(poly, translate_pre=translate_pre, translate_post=translate_post, scale=scale, flip=flip)
             patch = PathPatch(path, facecolor=facecolor, edgecolor='black', linewidth=linewidth, zorder=3+zorder_mod, linestyle=linestyle)
             axs.add_patch(patch)
-    elif isinstance(poly, sg.multipolygon.MultiPolygon):
-        for p in poly:
+    elif isinstance(poly, (sg.MultiPolygon, sg.GeometryCollection)):
+        for p in poly.geoms:
             plot_polygon(p, axes=axs, facecolor=facecolor, edgecolor=edgecolor, linewidth=linewidth, scale=scale, zorder_mod=zorder_mod, translate_pre=translate_pre, translate_post=translate_post, flip=flip)
 
 class Cartoon:
@@ -349,15 +349,9 @@ class Cartoon:
 def make_cartoon(args):
     """Build a cartoon in one-go. Called when running ``cellscape cartoon``."""
 
-    # accept list of chains for backwards-compatibility
-    # convert to string e.g. ABCD for current interface
-    # can be an issue if chains have more than one letter
-    if len(args.chain) == 1:
-        chain = args.chain[0]
-    else:
-        chain = ''.join(args.chain)
-
-    molecule = cellscape.Structure(args.pdb, chain=chain, model=args.model, uniprot=args.uniprot, view=False)
+    # each --chain value is matched as a whole chain ID (e.g. "AA") before falling
+    # back to the older "ABC" shorthand for chains A, B and C (see resolve_chains)
+    molecule = cellscape.Structure(args.pdb, chain=args.chain, model=args.model, uniprot=args.uniprot, view=False)
 
     # open first line to identify view file
     if args.view is not None:
