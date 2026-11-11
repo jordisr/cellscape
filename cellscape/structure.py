@@ -1,3 +1,4 @@
+import gzip
 import numpy as np
 import shapely.geometry as sg
 import shapely.ops as so
@@ -107,6 +108,59 @@ def split_on_labels(m, labels):
     assert(len(m) == total_coords)
     return coords
 
+PDB_EXTENSIONS = (".pdb", ".ent")
+CIF_EXTENSIONS = (".cif", ".mcif", ".mmcif")
+
+def load_structure(file):
+    """Parse a PDB or mmCIF file (optionally gzipped) into a Biopython Structure.
+
+    The format is chosen from the file extension, ignoring case, e.g.
+    ``1abc.pdb``, ``1ABC.CIF`` or ``1abc.cif.gz``.
+    """
+    name = file.lower()
+    compressed = name.endswith(".gz")
+    if compressed:
+        name = name[:-3]
+
+    if name.endswith(CIF_EXTENSIONS):
+        parser = MMCIFParser()
+    elif name.endswith(PDB_EXTENSIONS):
+        parser = PDBParser()
+    else:
+        sys.exit("File format not recognized! Expected one of {} (optionally .gz)".format(
+            ", ".join(PDB_EXTENSIONS + CIF_EXTENSIONS)))
+
+    if compressed:
+        with gzip.open(file, "rt") as handle:
+            return parser.get_structure(file, handle)
+    return parser.get_structure(file, file)
+
+def resolve_chains(requested, available):
+    """Turn a chain selection into a list of chain IDs present in the structure.
+
+    ``requested`` may be "all", a list of chain IDs, or a single string. Each
+    string is matched as a whole chain ID first, so multi-character IDs such as
+    "AA" work. If it doesn't match, it is treated as a run of single-character
+    IDs, so the older "ABC" shorthand still means chains A, B and C.
+    """
+    if isinstance(requested, str):
+        requested = [requested]
+    requested = list(requested)
+    if len(requested) == 1 and requested[0].lower() == "all":
+        return list(available)
+
+    chains = []
+    for token in requested:
+        if token in available:
+            chains.append(token)
+        elif all(c in available for c in token):
+            chains.extend(token)
+        else:
+            sys.exit("Chain {!r} not found in structure (available chains: {})".format(
+                token, ", ".join(available)))
+    # drop duplicates but keep the order given
+    return list(dict.fromkeys(chains))
+
 def get_dimensions(xy, end_window=50):
     dimensions = {}
     dimensions['width'] = np.max(xy[:,0]) - np.min(xy[:,0])
@@ -123,10 +177,11 @@ class Structure:
     def __init__(self, file, name=None, model=0, chain="all", uniprot=None, view=True, is_opm=False, res_start=None, res_end=None):
         """
         Args:
-            file (str): Path to PDB/mmCIF coordinates
+            file (str): Path to PDB/mmCIF coordinates (.pdb/.ent/.cif/.mcif/.mmcif, any case, optionally .gz)
             name (str, optional): Descriptive name for structure. Defaults to None.
             model (int, optional): Model number from structure. Defaults to 0.
-            chain (str, optional): Either "all" or list of chains to include e.g. "ABC". Defaults to "all".
+            chain (str or list, optional): "all", a list of chain IDs e.g. ["A", "AA"], or a string of
+                single-letter IDs e.g. "ABC". Defaults to "all".
             uniprot (str, optional): UniProt identifier (to download the record) or the path to a UniProt XML file. Defaults to None.
             view (bool, optional): Whether to use interactive NGLView widget. Defaults to True.
             is_opm (bool, optional): Structure is from Orientation of Proteins in Membranes database. Defaults to False.
@@ -141,23 +196,14 @@ class Structure:
             self.name = name
 
         # load structure with biopython
-        if file[-3:] in ["cif", "mcif"]:
-            parser = MMCIFParser()
-        elif file[-3:] in ["pdb", "ent"]:
-            parser = PDBParser()
-        else:
-            sys.exit("File format not recognized!")
-        self.structure = parser.get_structure(file, file)[model]
+        self.structure = load_structure(file)[model]
         _all_chains = [c.id for c in self.structure.get_chains()]
 
         # eliminate undesired chains from the biopython object
-        if chain.lower() == "all":
-            self.chains = _all_chains
-        else:
-            self.chains = list(chain)
-            for c in _all_chains:
-                if c not in self.chains:
-                    self.structure.detach_child(c)
+        self.chains = resolve_chains(chain, _all_chains)
+        for c in _all_chains:
+            if c not in self.chains:
+                self.structure.detach_child(c)
 
         # take chain start and end for first chain
         if res_start is not None and res_end is not None:

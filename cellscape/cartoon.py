@@ -349,15 +349,9 @@ class Cartoon:
 def make_cartoon(args):
     """Build a cartoon in one-go. Called when running ``cellscape cartoon``."""
 
-    # accept list of chains for backwards-compatibility
-    # convert to string e.g. ABCD for current interface
-    # can be an issue if chains have more than one letter
-    if len(args.chain) == 1:
-        chain = args.chain[0]
-    else:
-        chain = ''.join(args.chain)
-
-    molecule = cellscape.Structure(args.pdb, chain=chain, model=args.model, uniprot=args.uniprot, view=False)
+    # each --chain value is matched as a whole chain ID (e.g. "AA") before falling
+    # back to the older "ABC" shorthand for chains A, B and C (see resolve_chains)
+    molecule = cellscape.Structure(args.pdb, chain=args.chain, model=args.model, uniprot=args.uniprot, view=False)
 
     # open first line to identify view file
     if args.view is not None:
